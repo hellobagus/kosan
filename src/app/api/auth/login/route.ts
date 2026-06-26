@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
-import { createSession } from "@/lib/auth";
+import { attachSession } from "@/lib/auth";
 
 export async function POST(request: NextRequest) {
   try {
@@ -31,21 +31,31 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    await createSession({
+    const response = NextResponse.json({
+      message: "Login berhasil",
+      user: { id: user.id, name: user.name, email: user.email, role: user.role },
+    });
+
+    await attachSession(response, {
       userId: user.id,
       email: user.email,
       name: user.name,
       role: user.role,
     });
 
-    return NextResponse.json({
-      message: "Login berhasil",
-      user: { id: user.id, name: user.name, email: user.email, role: user.role },
-    });
+    return response;
   } catch (error) {
     console.error("Login error:", error);
+
+    const isDev = process.env.NODE_ENV === "development";
+    const detail =
+      error instanceof Error ? error.message : "Unknown error";
+
     return NextResponse.json(
-      { error: "Terjadi kesalahan server" },
+      {
+        error: "Terjadi kesalahan server",
+        ...(isDev && { detail }),
+      },
       { status: 500 }
     );
   }

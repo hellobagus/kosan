@@ -1,9 +1,20 @@
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
+import { NextResponse } from "next/server";
 import { UserRole } from "@prisma/client";
 
 const secretKey = process.env.JWT_SECRET || "fallback-secret-key";
 const key = new TextEncoder().encode(secretKey);
+
+function cookieOptions(expires: Date) {
+  return {
+    httpOnly: true,
+    secure: process.env.COOKIE_SECURE === "true",
+    expires,
+    sameSite: "lax" as const,
+    path: "/",
+  };
+}
 
 export interface SessionPayload {
   userId: number;
@@ -42,13 +53,16 @@ export async function createSession(payload: SessionPayload) {
   const expires = new Date(Date.now() + 24 * 60 * 60 * 1000);
   const session = await encrypt(payload);
   const cookieStore = await cookies();
-  cookieStore.set("session", session, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    expires,
-    sameSite: "lax",
-    path: "/",
-  });
+  cookieStore.set("session", session, cookieOptions(expires));
+}
+
+export async function attachSession(
+  response: NextResponse,
+  payload: SessionPayload
+) {
+  const expires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  const session = await encrypt(payload);
+  response.cookies.set("session", session, cookieOptions(expires));
 }
 
 export async function deleteSession() {

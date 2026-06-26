@@ -5,7 +5,7 @@ import { jwtVerify } from "jose";
 const secretKey = process.env.JWT_SECRET || "fallback-secret-key";
 const key = new TextEncoder().encode(secretKey);
 
-const publicPaths = ["/login", "/api/auth/login"];
+const publicPaths = ["/login", "/api/auth/login", "/api/health"];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
