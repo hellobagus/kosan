@@ -8,13 +8,20 @@
     "start": "next start",
     "lint": "next lint",
     "db:push": "prisma db push",
-    "db:seed": "npx tsx prisma/seed.ts",
-    "db:check": "npx tsx scripts/check-db.ts",
-    "db:setup": "prisma db push && npm run db:seed",
-    "db:studio": "prisma studio"
+    "db:seed": "tsx prisma/seed.ts",
+    "db:check": "tsx scripts/check-db.ts",
+    "db:setup": "prisma db push && yarn db:seed",
+    "db:studio": "prisma studio",
+    "pm2:start": "pm2 start ecosystem.config.cjs",
+    "pm2:stop": "pm2 stop kosanku",
+    "pm2:restart": "pm2 restart kosanku",
+    "pm2:delete": "pm2 delete kosanku",
+    "pm2:logs": "pm2 logs kosanku",
+    "pm2:status": "pm2 status kosanku",
+    "pm2:deploy": "prisma generate && yarn build && pm2 start ecosystem.config.cjs --update-env"
   },
   "prisma": {
-    "seed": "npx tsx prisma/seed.ts"
+    "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
@@ -36,6 +43,7 @@
     "prisma": "^5.22.0",
     "tailwindcss": "^3.4.1",
     "tsx": "^4.19.4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "pm2": "^6.0.8"
   }
 }
