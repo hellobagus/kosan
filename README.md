@@ -1,36 +1,128 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# KosanKu - Sistem Manajemen Informasi Sewa Kosan
 
-## Getting Started
+Aplikasi web untuk mengelola kosan (boarding house) dengan fitur lengkap: dashboard, manajemen kamar, penghuni, keuangan, laporan, dan akun pengguna.
 
-First, run the development server:
+## Tech Stack
+
+- **Framework:** Next.js 14 (App Router)
+- **Styling:** Tailwind CSS
+- **Database:** PostgreSQL
+- **ORM:** Prisma
+- **Auth:** JWT (jose) + bcrypt
+
+## Fitur
+
+1. **Dashboard** - Ringkasan kamar, penghuni, dan keuangan
+2. **Informasi Kamar** - Input kamar baru, kamar terisi, kamar kosong
+3. **Penghuni** - Penghuni aktif, input penghuni baru, penghuni selesai
+4. **Keuangan** - Pemasukan & pengeluaran (bulanan, tahunan, berdasarkan tanggal)
+5. **Cetak Laporan** - Generate dan cetak laporan
+6. **Daftar Akun** - Akun pengelola/pemilik dan akun penghuni
+
+## Setup
+
+### 1. Persyaratan
+
+- Node.js 18+ (disarankan)
+- PostgreSQL
+
+### 2. Install Dependencies
+
+Pastikan menggunakan **Node.js 18+** (disarankan Node 22):
+
+```bash
+nvm use 22        # jika pakai nvm
+node -v           # harus >= 18
+npm install
+```
+
+### 3. Konfigurasi Database
+
+Salin file environment:
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` dan sesuaikan koneksi PostgreSQL:
+
+```
+DATABASE_URL="postgresql://postgres:password@localhost:5432/kosanku?schema=public"
+JWT_SECRET="ganti-dengan-secret-key-yang-kuat"
+```
+
+### 4. Buat Database
+
+```bash
+# Buat database di PostgreSQL
+createdb kosanku
+
+# Atau jalankan SQL schema manual
+psql -U postgres -d kosanku -f database/schema.sql
+```
+
+### 5. Migrasi & Seed
+
+**Jika muncul error `permission denied for schema public`:**
+
+User database Anda (`bagus`) tidak punya hak membuat tabel di schema `public`.
+Ini umum di PostgreSQL 15+ / database hosting.
+
+**Solusi — minta admin DB jalankan sekali** (sebagai superuser `postgres`):
+
+```bash
+psql -h 43.173.1.89 -U postgres -d kosan_train -f database/setup-by-admin.sql
+```
+
+Atau copy-paste isi file `database/setup-by-admin.sql` di pgAdmin / DBeaver.
+
+Setelah admin menjalankan script di atas, lanjutkan:
+
+```bash
+npx prisma generate
+npm run db:seed
+npm run dev
+```
+
+**Jika Anda punya hak penuh di database**, cukup jalankan:
+
+```bash
+npx prisma generate
+npx prisma db push
+npm run db:seed
+```
+
+### 6. Jalankan Aplikasi
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Buka [http://localhost:3000](http://localhost:3000)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Akun Demo
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Role     | Email                  | Password    |
+|----------|------------------------|-------------|
+| Pemilik  | admin@kosanku.com      | admin123    |
+| Pengelola| manager@kosanku.com    | manager123  |
 
-## Learn More
+## Struktur Database
 
-To learn more about Next.js, take a look at the following resources:
+Lihat file `database/schema.sql` untuk query lengkap pembuatan tabel:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- `users` - Akun pengelola, pemilik, dan penghuni
+- `rooms` - Data kamar kosan
+- `tenants` - Data sewa/penghuni
+- `finances` - Pemasukan dan pengeluaran
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Scripts
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+npm run dev        # Development server
+npm run build      # Production build
+npm run start      # Production server
+npm run db:push    # Push schema ke database
+npm run db:seed    # Seed data demo
+npm run db:studio  # Prisma Studio (GUI database)
+```

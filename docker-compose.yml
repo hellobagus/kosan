@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: kosanku-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: kosanku
+    ports:
+      - "5433:5432"
+    volumes:
+      - kosanku_pgdata:/var/lib/postgresql/data
+
+volumes:
+  kosanku_pgdata:
