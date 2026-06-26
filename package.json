@@ -12,13 +12,13 @@
     "db:check": "tsx scripts/check-db.ts",
     "db:setup": "prisma db push && yarn db:seed",
     "db:studio": "prisma studio",
-    "pm2:start": "pm2 start ecosystem.config.cjs",
+    "pm2:start": "prisma generate && pm2 start ecosystem.config.cjs --update-env",
     "pm2:stop": "pm2 stop kosanku",
     "pm2:restart": "pm2 restart kosanku",
     "pm2:delete": "pm2 delete kosanku",
     "pm2:logs": "pm2 logs kosanku",
     "pm2:status": "pm2 status kosanku",
-    "pm2:deploy": "prisma generate && yarn build && pm2 start ecosystem.config.cjs --update-env"
+    "pm2:deploy": "APP_ENV=production prisma generate && yarn build && pm2 start ecosystem.config.cjs --update-env"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
