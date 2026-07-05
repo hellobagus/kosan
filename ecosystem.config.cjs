@@ -1,25 +1,23 @@
-const isProduction = process.env.APP_ENV === 'production';
-
-/** @type {import('pm2').StartOptions} */
 module.exports = {
   apps: [
     {
-      name: 'kosanku',
-      script: 'node_modules/next/dist/bin/next',
-      args: isProduction ? 'start' : 'dev',
-      cwd: __dirname,
+      name: "kosanku",
+      script: "node_modules/next/dist/bin/next",
+      args: "start",
+      cwd: "/var/www/html/kosanku",
       instances: 1,
-      exec_mode: 'fork',
       autorestart: true,
       watch: false,
-      max_memory_restart: '1G',
-      env_file: '.env',
+      max_memory_restart: "1G",
+      env_file: ".env",
       env: {
-        NODE_ENV: isProduction ? 'production' : 'development',
+        NODE_ENV: "production",
         PORT: 3000,
+        APP_ENV: "production",
       },
-      error_file: './logs/pm2-error.log',
-      out_file: './logs/pm2-out.log',
+      error_file: "logs/pm2-error.log",
+      out_file: "logs/pm2-out.log",
+      log_date_format: "YYYY-MM-DDTHH:mm:ss",
       merge_logs: true,
       time: true,
     },

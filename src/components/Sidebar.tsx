@@ -9,11 +9,13 @@ import {
   Wallet,
   FileText,
   UserCog,
+  Settings,
   LogOut,
   Building2,
   ChevronDown,
   Menu,
   X,
+  Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -49,7 +51,24 @@ const navigation = [
       { name: "Pengeluaran", href: "/keuangan/pengeluaran" },
     ],
   },
+  {
+    name: "Utilitas",
+    icon: Zap,
+    children: [
+      { name: "Daftar Utility", href: "/utilitas" },
+      { name: "Utility per Kamar", href: "/utilitas/kamar" },
+      { name: "Tagihan Bulanan", href: "/utilitas/tagihan" },
+    ],
+  },
   { name: "Cetak Laporan", href: "/laporan", icon: FileText },
+  {
+    name: "Pengaturan",
+    icon: Settings,
+    children: [
+      { name: "Profil Kosan", href: "/pengaturan/profil" },
+      { name: "Pengaturan Kosan", href: "/pengaturan/kosan" },
+    ],
+  },
   {
     name: "Daftar Akun",
     icon: UserCog,

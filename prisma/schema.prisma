@@ -31,6 +31,11 @@ enum PaymentStatus {
   PAID
 }
 
+enum TenantPaymentType {
+  FULL
+  INSTALLMENT
+}
+
 enum TransactionType {
   INCOME
   EXPENSE
@@ -47,6 +52,66 @@ enum PaymentRecordStatus {
   SUCCESS
   FAILED
   EXPIRED
+}
+
+enum GalleryCategory {
+  ROOM
+  FACILITY
+}
+
+enum UtilityType {
+  ELECTRICITY
+  WATER
+  INTERNET
+  GAS
+  OTHER
+}
+
+enum BillingMethod {
+  METER
+  LUMPSUM
+}
+
+model KosanProfile {
+  id                      Int      @id @default(1)
+  name                    String   @default("KosanKu") @db.VarChar(150)
+  address                 String?
+  phone                   String?  @db.VarChar(30)
+  email                   String?  @db.VarChar(150)
+  logoUrl                 String?  @map("logo_url")
+  gracePeriodDays         Int      @default(3) @map("grace_period_days")
+  latePenaltyPerDay       Decimal  @default(50000) @map("late_penalty_per_day") @db.Decimal(12, 2)
+  paymentNotes            String?  @map("payment_notes")
+  termsAndConditions      String?  @map("terms_and_conditions")
+  yearlyLeaseBonusEnabled Boolean  @default(true) @map("yearly_lease_bonus_enabled")
+  yearlyLeaseBonusMonths  Int      @default(1) @map("yearly_lease_bonus_months")
+  leaseBonusRules         Json?    @map("lease_bonus_rules")
+  leasePackages           Json?    @map("lease_packages")
+  updatedAt               DateTime @updatedAt @map("updated_at")
+
+  @@map("kosan_profile")
+}
+
+model BankAccount {
+  id            Int     @id @default(autoincrement())
+  bankName      String  @map("bank_name") @db.VarChar(50)
+  accountNumber String  @map("account_number") @db.VarChar(30)
+  accountHolder String  @map("account_holder") @db.VarChar(100)
+  sortOrder     Int     @default(0) @map("sort_order")
+
+  @@map("bank_accounts")
+}
+
+model GalleryImage {
+  id        Int             @id @default(autoincrement())
+  category  GalleryCategory
+  url       String
+  caption   String?         @db.VarChar(150)
+  sortOrder Int             @default(0) @map("sort_order")
+  createdAt DateTime        @default(now()) @map("created_at")
+
+  @@index([category])
+  @@map("gallery_images")
 }
 
 model User {
@@ -85,8 +150,10 @@ model Room {
   createdAt   DateTime   @default(now()) @map("created_at")
   updatedAt   DateTime   @updatedAt @map("updated_at")
 
-  tenants  Tenant[]
-  finances Finance[]
+  tenants       Tenant[]
+  finances      Finance[]
+  roomUtilities RoomUtility[]
+  utilityBills  UtilityBilling[]
 
   @@index([status])
   @@map("rooms")
@@ -108,19 +175,27 @@ model Tenant {
   additionalFees  Json?         @map("additional_fees")
   totalAmount     Decimal?      @map("total_amount") @db.Decimal(12, 2)
   paidAmount      Decimal       @default(0) @map("paid_amount") @db.Decimal(12, 2)
-  paymentStatus   PaymentStatus @default(UNPAID) @map("payment_status")
-  invoiceNumber   String?       @map("invoice_number") @db.VarChar(20)
+  paymentStatus        PaymentStatus     @default(UNPAID) @map("payment_status")
+  paymentType          TenantPaymentType @default(FULL) @map("payment_type")
+  leaseBonusMonths     Int               @default(0) @map("lease_bonus_months")
+  leaseGift            String?           @map("lease_gift")
+  invoiceNumber        String?           @map("invoice_number") @db.VarChar(20)
   lastPaymentDate DateTime?     @map("last_payment_date") @db.Date
   extensionDate   DateTime?     @map("extension_date") @db.Date
-  isDaily         Boolean       @default(false) @map("is_daily")
-  notes           String?
-  createdAt       DateTime      @default(now()) @map("created_at")
+  isDaily              Boolean       @default(false) @map("is_daily")
+  emergencyPhone       String?       @map("emergency_phone") @db.VarChar(20)
+  additionalOccupants  Json?         @map("additional_occupants")
+  termsAcceptedAt      DateTime?     @map("terms_accepted_at")
+  contractRequested    Boolean       @default(false) @map("contract_requested")
+  notes                String?
+  createdAt            DateTime      @default(now()) @map("created_at")
   updatedAt       DateTime      @updatedAt @map("updated_at")
 
   user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   room     Room      @relation(fields: [roomId], references: [id], onDelete: Restrict)
-  finances Finance[]
-  payments Payment[]
+  finances     Finance[]
+  payments     Payment[]
+  utilityBills UtilityBilling[]
 
   @@index([status])
   @@index([userId])
@@ -168,4 +243,67 @@ model Finance {
   @@index([transactionDate])
   @@index([type, transactionDate])
   @@map("finances")
+}
+
+model Utility {
+  id            Int           @id @default(autoincrement()) @map("utility_id")
+  utilityName   String        @map("utility_name") @db.VarChar(100)
+  utilityType   UtilityType   @map("utility_type")
+  billingMethod BillingMethod @map("billing_method")
+  amount        Decimal       @db.Decimal(12, 2)
+  unitLabel     String?       @map("unit_label") @db.VarChar(20)
+  active        Boolean       @default(true)
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  roomUtilities RoomUtility[]
+  billings      UtilityBilling[]
+
+  @@map("utilities")
+}
+
+model RoomUtility {
+  id           Int      @id @default(autoincrement())
+  roomId       Int      @map("room_id")
+  utilityId    Int      @map("utility_id")
+  lastReading  Decimal? @map("last_reading") @db.Decimal(12, 2)
+  customAmount Decimal? @map("custom_amount") @db.Decimal(12, 2)
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  room    Room    @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  utility Utility @relation(fields: [utilityId], references: [id], onDelete: Cascade)
+
+  @@unique([roomId, utilityId])
+  @@index([roomId])
+  @@map("room_utilities")
+}
+
+model UtilityBilling {
+  id            Int           @id @default(autoincrement())
+  roomId        Int           @map("room_id")
+  utilityId     Int           @map("utility_id")
+  tenantId      Int?          @map("tenant_id")
+  periodMonth   Int           @map("period_month")
+  periodYear    Int           @map("period_year")
+  prevReading   Decimal?      @map("prev_reading") @db.Decimal(12, 2)
+  currReading   Decimal?      @map("curr_reading") @db.Decimal(12, 2)
+  usage         Decimal?      @db.Decimal(12, 2)
+  ratePerUnit   Decimal       @map("rate_per_unit") @db.Decimal(12, 2)
+  totalAmount   Decimal       @map("total_amount") @db.Decimal(12, 2)
+  paidAmount    Decimal       @default(0) @map("paid_amount") @db.Decimal(12, 2)
+  paymentStatus PaymentStatus @default(UNPAID) @map("payment_status")
+  invoicedAt    DateTime?     @map("invoiced_at")
+  notes         String?
+  createdAt     DateTime      @default(now()) @map("created_at")
+
+  room    Room    @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  utility Utility @relation(fields: [utilityId], references: [id], onDelete: Restrict)
+  tenant  Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+
+  @@unique([roomId, utilityId, periodMonth, periodYear])
+  @@index([periodYear, periodMonth])
+  @@index([tenantId])
+  @@map("utility_billings")
 }

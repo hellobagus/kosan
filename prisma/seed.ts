@@ -270,6 +270,40 @@ async function main() {
     skipDuplicates: true,
   });
 
+  const defaultUtilities = [
+    { utilityName: "Listrik KWH", utilityType: "ELECTRICITY" as const, billingMethod: "METER" as const, amount: 1500, unitLabel: "kWh" },
+    { utilityName: "Air M3", utilityType: "WATER" as const, billingMethod: "METER" as const, amount: 8000, unitLabel: "m³" },
+    { utilityName: "Internet WiFi", utilityType: "INTERNET" as const, billingMethod: "LUMPSUM" as const, amount: 100000, unitLabel: null },
+    { utilityName: "Service Charge", utilityType: "OTHER" as const, billingMethod: "LUMPSUM" as const, amount: 50000, unitLabel: null },
+  ];
+
+  for (const u of defaultUtilities) {
+    const existing = await prisma.utility.findFirst({ where: { utilityName: u.utilityName } });
+    if (!existing) {
+      await prisma.utility.create({ data: u });
+    }
+  }
+
+  const utilities = await prisma.utility.findMany();
+  const occupiedRooms = await prisma.room.findMany({
+    where: { status: "OCCUPIED" },
+    take: 3,
+  });
+
+  for (const room of occupiedRooms) {
+    for (const utility of utilities) {
+      await prisma.roomUtility.upsert({
+        where: { roomId_utilityId: { roomId: room.id, utilityId: utility.id } },
+        create: {
+          roomId: room.id,
+          utilityId: utility.id,
+          lastReading: utility.billingMethod === "METER" ? 1000 : null,
+        },
+        update: {},
+      });
+    }
+  }
+
   console.log("Seed completed!");
   console.log("Admin: admin@kosanku.com / admin123");
 }

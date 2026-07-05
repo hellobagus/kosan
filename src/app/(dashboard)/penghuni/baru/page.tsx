@@ -8,13 +8,21 @@ import { PageHeader, Card, CardBody, Button } from "@/components/ui";
 import { formatCurrency } from "@/lib/utils";
 import {
   AdditionalFee,
+  AdditionalOccupant,
   EXTRA_OCCUPANT_FEE,
-  LEASE_OPTIONS,
   calcDueDate,
   calcExtraOccupantFee,
   calcTotalAmount,
+  findLeasePackage,
+  formatLeaseDurationLabel,
+  formatLeasePackageOption,
+  getLeaseBonusMonths,
+  leaseValueFromMonths,
   normalizeAdditionalFees,
   parseAmount,
+  parseLeasePackages,
+  type LeasePackage,
+  type TenantPaymentType,
 } from "@/lib/tenant-utils";
 
 interface Room {
@@ -161,11 +169,20 @@ function TambahPenghuniForm() {
   const [error, setError] = useState("");
   const [showBanner, setShowBanner] = useState(true);
   const [agreed, setAgreed] = useState(false);
+  const [agreedTerms, setAgreedTerms] = useState(false);
+  const [agreedContract, setAgreedContract] = useState(false);
   const [ktpFileName, setKtpFileName] = useState("");
+  const [kosanSettings, setKosanSettings] = useState({
+    termsAndConditions: "",
+    leasePackages: [] as LeasePackage[],
+  });
+  const [additionalOccupants, setAdditionalOccupants] = useState<AdditionalOccupant[]>([]);
   const [form, setForm] = useState({
     rentType: "",
     name: "",
+    email: "",
     phone: "",
+    emergencyPhone: "",
     gender: "",
     ktp: "",
     npwp: "",
@@ -176,6 +193,7 @@ function TambahPenghuniForm() {
     monthlyRent: "",
     deposit: "0",
     leaseDuration: "",
+    paymentType: "FULL" as TenantPaymentType,
     occupantCount: "",
     discount: "0",
     additionalFees: [] as AdditionalFee[],
@@ -201,16 +219,52 @@ function TambahPenghuniForm() {
           }
         }
       });
+
+    fetch("/api/settings")
+      .then((res) => res.json())
+      .then((data) => {
+        const p = data.profile || {};
+        setKosanSettings({
+          termsAndConditions: p.termsAndConditions || "",
+          leasePackages: parseLeasePackages(p.leasePackages, {
+            leaseBonusRules: p.leaseBonusRules,
+            yearlyLeaseBonusEnabled: p.yearlyLeaseBonusEnabled,
+            yearlyLeaseBonusMonths: p.yearlyLeaseBonusMonths,
+          }),
+        });
+      })
+      .catch(() => {});
   }, [preselectedRoomId]);
+
+  useEffect(() => {
+    const count = parseInt(form.occupantCount || "1");
+    const needed = Math.max(0, count - 1);
+    setAdditionalOccupants((prev) => {
+      const next = [...prev];
+      while (next.length < needed) next.push({ name: "", ktp: "" });
+      while (next.length > needed) next.pop();
+      return next;
+    });
+  }, [form.occupantCount]);
 
   const selectedRoom = rooms.find((r) => r.id === parseInt(form.roomId));
   const isDaily = form.rentType === "HARIAN";
 
   const leaseOptions = useMemo(() => {
-    if (form.rentType === "HARIAN") return LEASE_OPTIONS.filter((o) => o.value === "1 Hari");
-    if (form.rentType === "BULANAN") return LEASE_OPTIONS.filter((o) => o.value !== "1 Hari");
+    if (form.rentType === "HARIAN") {
+      return [{ value: "1 Hari", label: "1 Hari", months: 0 }];
+    }
+    if (form.rentType === "BULANAN") {
+      return kosanSettings.leasePackages.map((pkg) => ({
+        value: leaseValueFromMonths(pkg.months),
+        label: formatLeasePackageOption(pkg, form.paymentType),
+        months: pkg.months,
+        gift: pkg.gift,
+        bonusMonths: pkg.bonusMonths,
+      }));
+    }
     return [];
-  }, [form.rentType]);
+  }, [form.rentType, form.paymentType, kosanSettings.leasePackages]);
 
   const availableRooms = useMemo(() => {
     if (!form.rentType) return [];
@@ -227,12 +281,27 @@ function TambahPenghuniForm() {
   const discount = parseFloat(form.discount || "0");
   const occupantCount = parseInt(form.occupantCount || "1");
   const extraOcc = calcExtraOccupantFee(occupantCount);
+  const leaseBonusMonths = getLeaseBonusMonths(
+    form.leaseDuration,
+    kosanSettings.leasePackages,
+    form.paymentType
+  );
+  const selectedLeasePkg = findLeasePackage(form.leaseDuration, kosanSettings.leasePackages);
+  const leaseDisplayLabel = form.leaseDuration
+    ? formatLeaseDurationLabel(
+        form.leaseDuration,
+        leaseBonusMonths,
+        form.paymentType === "FULL" ? selectedLeasePkg?.gift : null
+      )
+    : "-";
 
   const checkInDate = form.checkIn ? new Date(form.checkIn) : undefined;
   const dueDate =
-    form.checkIn && form.leaseDuration ? calcDueDate(new Date(form.checkIn), form.leaseDuration) : null;
+    form.checkIn && form.leaseDuration
+      ? calcDueDate(new Date(form.checkIn), form.leaseDuration, leaseBonusMonths)
+      : null;
 
-  const opt = LEASE_OPTIONS.find((o) => o.value === form.leaseDuration);
+  const opt = leaseOptions.find((o) => o.value === form.leaseDuration);
   let roomTotal = 0;
   if (rent > 0 && form.leaseDuration) {
     if (isDaily || form.leaseDuration === "1 Hari") {
@@ -267,6 +336,7 @@ function TambahPenghuniForm() {
       leaseDuration: "",
       roomId: "",
       monthlyRent: "",
+      paymentType: rentType === "HARIAN" ? "FULL" : prev.paymentType,
     }));
   };
 
@@ -298,8 +368,20 @@ function TambahPenghuniForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!agreedTerms) {
+      setError("Anda harus menyetujui Syarat & Ketentuan.");
+      return;
+    }
+    if (!agreedContract) {
+      setError("Anda harus menyetujui penerimaan Kontrak Sewa via email.");
+      return;
+    }
     if (!agreed) {
       setError("Centang 'Data Sudah Benar' sebelum menyimpan.");
+      return;
+    }
+    if (!form.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
+      setError("Email penghuni wajib diisi dengan format yang valid.");
       return;
     }
     if (!ktpFileName) {
@@ -310,9 +392,27 @@ function TambahPenghuniForm() {
       setError("Nomor handphone harus diawali dengan 08.");
       return;
     }
+    if (form.emergencyPhone && !form.emergencyPhone.startsWith("08")) {
+      setError("Nomor emergency call harus diawali dengan 08.");
+      return;
+    }
     if (form.ktp && form.ktp.length !== 16) {
       setError("No. KTP harus 16 digit.");
       return;
+    }
+    if (occupantCount >= 2) {
+      const required = occupantCount - 1;
+      for (let i = 0; i < required; i++) {
+        const o = additionalOccupants[i];
+        if (!o?.name?.trim()) {
+          setError(`Nama penghuni ke-${i + 2} wajib diisi.`);
+          return;
+        }
+        if (!o?.ktp || o.ktp.length !== 16) {
+          setError(`No. KTP penghuni ke-${i + 2} harus 16 digit.`);
+          return;
+        }
+      }
     }
 
     setLoading(true);
@@ -328,10 +428,14 @@ function TambahPenghuniForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...form,
+          paymentType: isDaily ? "FULL" : form.paymentType,
           isDaily,
           notes: notesParts.filter(Boolean).join("\n") || undefined,
           occupantCount: form.occupantCount || "1",
           leaseDuration: form.leaseDuration || "1 Bulan",
+          additionalOccupants: additionalOccupants.slice(0, Math.max(0, occupantCount - 1)),
+          agreedTerms: true,
+          contractRequested: true,
         }),
       });
       const data = await res.json();
@@ -448,10 +552,48 @@ function TambahPenghuniForm() {
               >
                 <option value="">- Pilih Lama Sewa -</option>
                 {leaseOptions.map((o) => (
-                  <option key={o.value} value={o.value}>
+                    <option key={o.value} value={o.value}>
                     {o.label}
-                  </option>
+                    </option>
                 ))}
+              </select>
+              {form.paymentType === "FULL" && selectedLeasePkg?.gift && (
+                <p className="text-xs mt-1.5 text-emerald-600 font-medium">
+                  Hadiah: {selectedLeasePkg.gift}
+                  {leaseBonusMonths > 0 && (
+                    <> (+{leaseBonusMonths} bulan masa sewa)</>
+                  )}
+                  {dueDate && (
+                    <> — berakhir {dueDate.toLocaleDateString("id-ID")}.</>
+                  )}
+                </p>
+              )}
+              {form.paymentType === "INSTALLMENT" && form.leaseDuration && (
+                <p className="text-xs mt-1.5 text-amber-600">
+                  Cicilan per bulan — bonus bulan gratis tidak berlaku.
+                  {dueDate && (
+                    <> Masa sewa berakhir: {dueDate.toLocaleDateString("id-ID")}.</>
+                  )}
+                </p>
+              )}
+            </FormRow>
+
+            <FormRow
+              label="Tipe Pembayaran"
+              required
+              hint="Bonus bulan gratis hanya berlaku untuk Bayar Lunas Sekaligus."
+            >
+              <select
+                className={selectClass}
+                value={form.paymentType}
+                onChange={(e) =>
+                  setForm({ ...form, paymentType: e.target.value as TenantPaymentType })
+                }
+                required
+                disabled={!form.rentType || isDaily}
+              >
+                <option value="FULL">Bayar Lunas Sekaligus</option>
+                <option value="INSTALLMENT">Cicilan Per Bulan</option>
               </select>
             </FormRow>
 
@@ -465,6 +607,21 @@ function TambahPenghuniForm() {
               />
             </FormRow>
 
+            <FormRow
+              label="Email Penghuni"
+              required
+              hint="Email ini akan digunakan sebagai akun login penghuni."
+            >
+              <input
+                type="email"
+                className={inputClass}
+                placeholder="penghuni@email.com"
+                value={form.email}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
+                required
+              />
+            </FormRow>
+
             <FormRow label="Nomor Handphone" required hint="Awali nomor dengan 08.">
               <div className="relative">
                 <Smartphone className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -473,6 +630,23 @@ function TambahPenghuniForm() {
                   placeholder="08987654321"
                   value={form.phone}
                   onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                  required
+                />
+              </div>
+            </FormRow>
+
+            <FormRow
+              label="Emergency Call"
+              required
+              hint="No. telepon penanggung jawab, kerabat, atau keluarga yang dapat dihubungi."
+            >
+              <div className="relative">
+                <Smartphone className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  className={`${inputClass} pl-9`}
+                  placeholder="08987654321"
+                  value={form.emergencyPhone}
+                  onChange={(e) => setForm({ ...form, emergencyPhone: e.target.value })}
                   required
                 />
               </div>
@@ -579,6 +753,49 @@ function TambahPenghuniForm() {
               </select>
             </FormRow>
 
+            {occupantCount >= 2 && (
+              <div className="border border-amber-200 bg-amber-50/50 rounded-lg px-4 my-2">
+                <p className="text-sm font-semibold text-amber-800 py-3 border-b border-amber-200">
+                  Data Penghuni Tambahan ({occupantCount - 1} orang)
+                </p>
+                {additionalOccupants.map((occ, index) => (
+                  <div key={index} className="py-3 border-b border-amber-100 last:border-0">
+                    <p className="text-xs font-medium text-amber-700 mb-2">
+                      Penghuni ke-{index + 2}
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <input
+                        className={inputClass}
+                        placeholder="Nama sesuai KTP"
+                        value={occ.name}
+                        onChange={(e) => {
+                          const next = [...additionalOccupants];
+                          next[index] = { ...next[index], name: e.target.value };
+                          setAdditionalOccupants(next);
+                        }}
+                        required
+                      />
+                      <input
+                        className={inputClass}
+                        placeholder="16 digit No. KTP"
+                        value={occ.ktp}
+                        onChange={(e) => {
+                          const next = [...additionalOccupants];
+                          next[index] = {
+                            ...next[index],
+                            ktp: e.target.value.replace(/\D/g, "").slice(0, 16),
+                          };
+                          setAdditionalOccupants(next);
+                        }}
+                        maxLength={16}
+                        required
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <FormRow label="Keterangan">
               <textarea
                 className={`${inputClass} resize-none`}
@@ -637,7 +854,7 @@ function TambahPenghuniForm() {
                 </div>
                 <div className="flex justify-between">
                   <dt>Lama Sewa</dt>
-                  <dd>{form.leaseDuration || "-"}</dd>
+                  <dd>{leaseDisplayLabel}</dd>
                 </div>
                 <div className="flex justify-between">
                   <dt>Deposit</dt>
@@ -662,6 +879,48 @@ function TambahPenghuniForm() {
               Pastikan Data diatas Sudah Benar, Kamar &amp; Foto KTP tidak dapat dirubah setelah data
               diproses/tersimpan.
             </p>
+
+            <div className="mt-6 border border-slate-200 rounded-lg overflow-hidden">
+              <div className="bg-slate-100 text-center font-semibold text-sm text-slate-800 py-2.5 border-b border-slate-200">
+                Syarat &amp; Ketentuan
+              </div>
+              <div className="px-4 py-3 text-sm text-slate-600 max-h-40 overflow-y-auto whitespace-pre-wrap">
+                {kosanSettings.termsAndConditions ||
+                  "Syarat & Ketentuan belum diatur oleh pemilik kosan. Silakan atur di menu Pengaturan > Kosan."}
+              </div>
+              <label className="flex items-center gap-2 px-4 py-3 border-t border-slate-200 text-sm text-slate-700 bg-slate-50">
+                <input
+                  type="checkbox"
+                  checked={agreedTerms}
+                  onChange={(e) => setAgreedTerms(e.target.checked)}
+                  className="rounded border-slate-300"
+                />
+                <span>
+                  Saya telah membaca dan menyetujui Syarat &amp; Ketentuan<RequiredMark />
+                </span>
+              </label>
+            </div>
+
+            <div className="mt-4 border border-slate-200 rounded-lg overflow-hidden">
+              <div className="bg-slate-100 text-center font-semibold text-sm text-slate-800 py-2.5 border-b border-slate-200">
+                Kontrak Sewa
+              </div>
+              <div className="px-4 py-3 text-sm text-slate-600">
+                Kontrak sewa akan dikirim ke email penghuni ({form.email || "belum diisi"}) dalam
+                format PDF setelah data disimpan.
+              </div>
+              <label className="flex items-center gap-2 px-4 py-3 border-t border-slate-200 text-sm text-slate-700 bg-slate-50">
+                <input
+                  type="checkbox"
+                  checked={agreedContract}
+                  onChange={(e) => setAgreedContract(e.target.checked)}
+                  className="rounded border-slate-300"
+                />
+                <span>
+                  Saya setuju menerima Kontrak Sewa via email<RequiredMark />
+                </span>
+              </label>
+            </div>
 
             <label className="flex items-center justify-center gap-2 mt-4 text-sm text-slate-700">
               <input

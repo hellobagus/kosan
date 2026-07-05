@@ -1,6 +1,7 @@
 import { PaymentMethod, PaymentRecordStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { parseAmount } from "@/lib/tenant-utils";
+import { allocateUtilityPayment } from "@/lib/utility-invoice-service";
 
 type TxClient = Prisma.TransactionClient;
 
@@ -68,18 +69,42 @@ export async function applySuccessfulPayment(
     },
   });
 
-  await tx.finance.create({
-    data: {
-      type: "INCOME",
-      amount: params.amount,
-      description: `Pembayaran ${getPaymentMethodLabel(params.method)} - ${tenant.user.name} (Kamar ${tenant.room.roomNumber})`,
-      category: "Sewa",
-      transactionDate: new Date(),
-      tenantId: params.tenantId,
-      roomId: tenant.roomId,
-      createdBy: params.createdBy ?? null,
-    },
-  });
+  const { utilityPaid, allocations } = await allocateUtilityPayment(
+    tx,
+    params.tenantId,
+    params.amount
+  );
+  const rentPaid = Math.max(0, params.amount - utilityPaid);
+
+  if (rentPaid > 0) {
+    await tx.finance.create({
+      data: {
+        type: "INCOME",
+        amount: rentPaid,
+        description: `Pembayaran ${getPaymentMethodLabel(params.method)} - ${tenant.user.name} (Kamar ${tenant.room.roomNumber})`,
+        category: "Sewa",
+        transactionDate: new Date(),
+        tenantId: params.tenantId,
+        roomId: tenant.roomId,
+        createdBy: params.createdBy ?? null,
+      },
+    });
+  }
+
+  for (const alloc of allocations) {
+    await tx.finance.create({
+      data: {
+        type: "INCOME",
+        amount: alloc.amount,
+        description: `Pembayaran ${alloc.category} - ${tenant.user.name} (Kamar ${tenant.room.roomNumber})`,
+        category: alloc.category,
+        transactionDate: new Date(),
+        tenantId: params.tenantId,
+        roomId: tenant.roomId,
+        createdBy: params.createdBy ?? null,
+      },
+    });
+  }
 
   return tx.payment.findUnique({ where: { id: payment.id } });
 }

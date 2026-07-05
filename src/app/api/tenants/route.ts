@@ -7,9 +7,15 @@ import {
   calcDueDate,
   calcTotalAmount,
   generateInvoiceNumber,
+  getLeaseBonusMonths,
+  findLeasePackage,
   parseAdditionalFees,
+  parseAdditionalOccupants,
   parseAmount,
+  parseLeasePackages,
+  type TenantPaymentType,
 } from "@/lib/tenant-utils";
+import { getKosanProfile } from "@/lib/settings-service";
 
 function parseStatusParam(value: string | null): TenantStatus | undefined {
   if (!value) return undefined;
@@ -50,10 +56,20 @@ export async function POST(request: NextRequest) {
       name, email, phone, address, roomId, checkIn, monthlyRent, deposit, notes, password,
       status, leaseDuration, occupantCount, discount, additionalFees, isDaily,
       gender, ktp, maritalStatus, occupation, paidAmount, paymentStatus,
+      emergencyPhone, additionalOccupants, agreedTerms, contractRequested,
+      paymentType,
     } = body;
 
     if (!name || !roomId || !checkIn || !monthlyRent) {
       return NextResponse.json({ error: "Data wajib belum lengkap" }, { status: 400 });
+    }
+
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return NextResponse.json({ error: "Email penghuni wajib dan harus valid" }, { status: 400 });
+    }
+
+    if (!agreedTerms) {
+      return NextResponse.json({ error: "Syarat & Ketentuan harus disetujui" }, { status: 400 });
     }
 
     const room = await prisma.room.findUnique({ where: { id: parseInt(roomId) } });
@@ -67,10 +83,13 @@ export async function POST(request: NextRequest) {
     }
 
     let userId: number;
-    const tenantEmail = email || `penghuni_${Date.now()}@kosanku.local`;
+    const tenantEmail = email.trim().toLowerCase();
 
     const existingUser = await prisma.user.findUnique({ where: { email: tenantEmail } });
     if (existingUser) {
+      if (existingUser.role !== "TENANT") {
+        return NextResponse.json({ error: "Email sudah digunakan akun lain" }, { status: 400 });
+      }
       userId = existingUser.id;
       await prisma.user.update({
         where: { id: userId },
@@ -105,14 +124,48 @@ export async function POST(request: NextRequest) {
 
     const lease = leaseDuration || "1 Bulan";
     const checkInDate = new Date(checkIn);
-    const dueDate = calcDueDate(checkInDate, lease);
+    const profile = await getKosanProfile();
+    const leasePackages = parseLeasePackages(profile.leasePackages, {
+      leaseBonusRules: profile.leaseBonusRules,
+      yearlyLeaseBonusEnabled: profile.yearlyLeaseBonusEnabled,
+      yearlyLeaseBonusMonths: profile.yearlyLeaseBonusMonths,
+    });
+    const payType: TenantPaymentType =
+      paymentType === "INSTALLMENT" ? "INSTALLMENT" : "FULL";
+
+    if (!isDaily && lease !== "1 Hari") {
+      const pkg = findLeasePackage(lease, leasePackages);
+      if (!pkg) {
+        return NextResponse.json({ error: "Lama sewa tidak tersedia dalam pengaturan kosan" }, { status: 400 });
+      }
+    }
+
+    const selectedPkg = findLeasePackage(lease, leasePackages);
+    const bonusMonths = getLeaseBonusMonths(lease, leasePackages, payType);
+    const leaseGift =
+      payType === "FULL" && selectedPkg?.gift ? selectedPkg.gift : null;
+    const dueDate = calcDueDate(checkInDate, lease, bonusMonths);
     const fees = parseAdditionalFees(additionalFees);
+    const occupants = parseAdditionalOccupants(additionalOccupants);
+    const occCount = occupantCount ? parseInt(occupantCount) : 1;
+
+    if (occCount >= 2) {
+      const required = occCount - 1;
+      if (occupants.length < required) {
+        return NextResponse.json({ error: `Data penghuni tambahan wajib diisi (${required} orang)` }, { status: 400 });
+      }
+      for (const o of occupants.slice(0, required)) {
+        if (!o.name || o.ktp.length !== 16) {
+          return NextResponse.json({ error: "Nama dan No. KTP penghuni tambahan wajib lengkap (16 digit)" }, { status: 400 });
+        }
+      }
+    }
     const total = calcTotalAmount({
       monthlyRent: parseFloat(monthlyRent),
       dailyPrice: room.dailyPrice ? parseAmount(room.dailyPrice) : null,
       isDaily: isDaily || lease === "1 Hari",
       leaseDuration: lease,
-      occupantCount: occupantCount ? parseInt(occupantCount) : 1,
+      occupantCount: occCount,
       discount: discount ? parseFloat(discount) : 0,
       deposit: deposit ? parseFloat(deposit) : 0,
       additionalFees: fees,
@@ -135,9 +188,16 @@ export async function POST(request: NextRequest) {
           notes: notes || null,
           status: tenantStatus as "ACTIVE" | "RESERVED",
           leaseDuration: lease,
-          occupantCount: occupantCount ? parseInt(occupantCount) : 1,
+          occupantCount: occCount,
           discount: discount ? parseFloat(discount) : 0,
           additionalFees: fees.length > 0 ? (fees as unknown as Prisma.InputJsonValue) : undefined,
+          additionalOccupants: occupants.length > 0 ? (occupants as unknown as Prisma.InputJsonValue) : undefined,
+          emergencyPhone: emergencyPhone || null,
+          termsAcceptedAt: new Date(),
+          contractRequested: contractRequested === true,
+          paymentType: payType,
+          leaseBonusMonths: bonusMonths,
+          leaseGift,
           totalAmount: total,
           paidAmount: paid,
           paymentStatus: payStatus as "UNPAID" | "PARTIAL" | "PAID",
@@ -356,6 +416,20 @@ export async function PUT(request: NextRequest) {
         return t;
       });
       return NextResponse.json(updated);
+    }
+
+    if (action === "apply_utility_invoice") {
+      const { periodMonth, periodYear } = body;
+      if (!periodMonth || !periodYear) {
+        return NextResponse.json({ error: "Bulan dan tahun wajib diisi" }, { status: 400 });
+      }
+      const { applyUtilityBillsToInvoice } = await import("@/lib/utility-invoice-service");
+      const result = await applyUtilityBillsToInvoice({
+        tenantId: parseInt(id),
+        periodMonth: parseInt(periodMonth),
+        periodYear: parseInt(periodYear),
+      });
+      return NextResponse.json(result);
     }
 
     // Legacy checkout without action

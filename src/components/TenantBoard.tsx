@@ -275,25 +275,19 @@ export default function TenantBoard({ defaultTab = "ACTIVE" }: { defaultTab?: Ta
     window.open(`https://wa.me/62${phone.startsWith("0") ? phone.slice(1) : phone}?text=${msg}`, "_blank");
   };
 
-  const printInvoice = (tenant: TenantData) => {
-    const inv = tenant.invoiceNumber || `#${tenant.id}`;
-    const html = `<!DOCTYPE html><html><head><title>Invoice ${inv}</title>
-      <style>body{font-family:sans-serif;padding:40px;max-width:600px;margin:0 auto}
-      h1{text-align:center;color:#0d9488}table{width:100%;border-collapse:collapse;margin:20px 0}
-      td{padding:8px;border-bottom:1px solid #eee}.total{font-size:1.2em;font-weight:bold}
-      .stamp{color:green;font-size:1.5em;text-align:center;margin:20px}</style></head><body>
-      <h1>INVOICE PEMBAYARAN</h1><p style="text-align:center">${inv}</p>
-      <table><tr><td>Nama</td><td>${tenant.user.name}</td></tr>
-      <tr><td>Kamar</td><td>${tenant.room.roomNumber}</td></tr>
-      <tr><td>Tanggal Masuk</td><td>${formatDate(tenant.checkIn)}</td></tr>
-      <tr><td>Berakhir</td><td>${tenant.dueDate ? formatDate(tenant.dueDate) : "-"}</td></tr>
-      <tr><td>Lama Sewa</td><td>${tenant.leaseDuration || "-"}</td></tr>
-      <tr><td class="total">Total</td><td class="total">${formatCurrency(tenant.totalAmount || tenant.monthlyRent)}</td></tr>
-      <tr><td>Terbayar</td><td>${formatCurrency(tenant.paidAmount)}</td></tr></table>
-      ${tenant.paymentStatus === "PAID" ? `<div class="stamp">[ LUNAS ]</div>` : ""}
-      </body></html>`;
-    const w = window.open("", "_blank");
-    if (w) { w.document.write(html); w.document.close(); w.print(); }
+  const printInvoice = async (tenant: TenantData) => {
+    try {
+      const res = await fetch(`/api/tenants/${tenant.id}/invoice`);
+      const breakdown = await res.json();
+      if (!res.ok) {
+        alert(breakdown.error || "Gagal memuat invoice");
+        return;
+      }
+      const { printInvoiceHtml } = await import("@/lib/invoice-print");
+      printInvoiceHtml(tenant, breakdown);
+    } catch {
+      alert("Gagal mencetak invoice");
+    }
   };
 
   if (loading && tenants.length === 0) {
@@ -770,6 +764,36 @@ function DetailModal({ tenant, onClose, onInvoice }: {
 }) {
   const penalty = calcLatePenalty(tenant.dueDate ? new Date(tenant.dueDate) : null);
   const total = parseAmount(tenant.totalAmount || tenant.monthlyRent);
+  const fees = parseAdditionalFees(tenant.additionalFees);
+  const utilityFees = fees.filter((f) => f.utilityBillingId);
+  const manualFees = fees.filter((f) => !f.utilityBillingId);
+  const [applyingUtility, setApplyingUtility] = useState(false);
+
+  const applyUtilityInvoice = async () => {
+    const now = new Date();
+    const invoiceMonth = now.getMonth() + 1;
+    const invoiceYear = now.getFullYear();
+    const usageMonth = invoiceMonth === 1 ? 12 : invoiceMonth - 1;
+    const usageYear = invoiceMonth === 1 ? invoiceYear - 1 : invoiceYear;
+    if (!confirm(
+      `Terapkan tagihan utility pemakaian ${usageMonth}/${usageYear} ke invoice bulan ini?`
+    )) return;
+    setApplyingUtility(true);
+    const res = await fetch("/api/tenants", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id: tenant.id,
+        action: "apply_utility_invoice",
+        periodMonth: usageMonth,
+        periodYear: usageYear,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) alert(data.error || "Gagal menerapkan tagihan utility");
+    else alert(`Berhasil menambahkan ${data.appliedCount} tagihan utility ke invoice`);
+    setApplyingUtility(false);
+  };
 
   return (
     <Modal title={`Penghuni Kamar ${tenant.room.roomNumber}`} onClose={onClose} wide>
@@ -815,8 +839,17 @@ function DetailModal({ tenant, onClose, onInvoice }: {
           <h3 className="font-semibold text-sm mt-4 mb-2 border-b pb-1">Harga & Pembayaran</h3>
           <dl className="space-y-1 text-sm">
             <div className="flex"><dt className="w-32 font-medium">Harga Kamar</dt><dd>{formatCurrency(tenant.monthlyRent)}</dd></div>
+            {manualFees.map((f) => (
+              <div key={f.name} className="flex"><dt className="w-32 font-medium truncate">{f.name}</dt><dd>{formatCurrency(f.amount)}</dd></div>
+            ))}
+            {utilityFees.map((f) => (
+              <div key={f.name} className="flex text-teal-700">
+                <dt className="w-32 font-medium truncate">{f.name}</dt><dd>{formatCurrency(f.amount)}</dd>
+              </div>
+            ))}
             <div className="flex"><dt className="w-32 font-medium">Total</dt><dd className="font-bold">{formatCurrency(total)}</dd></div>
             <div className="flex"><dt className="w-32 font-medium">Pembayaran</dt><dd>{formatCurrency(tenant.paidAmount)}</dd></div>
+            <div className="flex"><dt className="w-32 font-medium">Sisa</dt><dd className="text-red-600 font-semibold">{formatCurrency(total - parseAmount(tenant.paidAmount))}</dd></div>
           </dl>
           {tenant.paymentStatus === "PAID" && (
             <div className="mt-3 text-center">
@@ -827,11 +860,16 @@ function DetailModal({ tenant, onClose, onInvoice }: {
           )}
         </div>
       </div>
-      <div className="flex gap-3 mt-6">
-        <Button onClick={onInvoice} className="flex-1">
+      <div className="flex flex-wrap gap-3 mt-6">
+        <Button onClick={onInvoice} className="flex-1 min-w-[140px]">
           <FileText className="w-4 h-4" /> Invoice {tenant.invoiceNumber || ""}
         </Button>
-        <Button variant="secondary" onClick={onClose} className="flex-1">Keluar</Button>
+        {tenant.status === "ACTIVE" && (
+          <Button variant="secondary" onClick={applyUtilityInvoice} disabled={applyingUtility} className="flex-1 min-w-[140px]">
+            <RefreshCw className={`w-4 h-4 ${applyingUtility ? "animate-spin" : ""}`} /> Tagihan Utility
+          </Button>
+        )}
+        <Button variant="secondary" onClick={onClose} className="flex-1 min-w-[100px]">Keluar</Button>
       </div>
     </Modal>
   );

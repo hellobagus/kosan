@@ -6,6 +6,7 @@ import { Button, Input } from "@/components/ui";
 import { cn, formatCurrency } from "@/lib/utils";
 import { parseAmount } from "@/lib/tenant-utils";
 import type { TenantData } from "@/components/TenantBoard";
+import type { InvoiceBreakdown } from "@/lib/invoice-print";
 
 type PaymentMethod = "CASH" | "TRANSFER" | "MIDTRANS";
 
@@ -77,6 +78,7 @@ export function PaymentModal({
   const [error, setError] = useState("");
   const [midtransOrderId, setMidtransOrderId] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState("");
+  const [breakdown, setBreakdown] = useState<InvoiceBreakdown | null>(null);
 
   const parsedAmount = parseFloat(amount || "0");
   const amountInvalid = !amount || Number.isNaN(parsedAmount) || parsedAmount <= 0 || parsedAmount > remaining;
@@ -93,6 +95,13 @@ export function PaymentModal({
   useEffect(() => {
     setAmount(String(remaining || ""));
   }, [remaining]);
+
+  useEffect(() => {
+    fetch(`/api/tenants/${tenant.id}/invoice`)
+      .then((r) => r.json())
+      .then((data) => { if (data.total != null) setBreakdown(data); })
+      .catch(() => setBreakdown(null));
+  }, [tenant.id]);
 
   const pollPaymentStatus = async (orderId: string) => {
     for (let i = 0; i < 10; i++) {
@@ -211,6 +220,32 @@ export function PaymentModal({
                 <dd className="font-bold text-red-600">{formatCurrency(remaining)}</dd>
               </div>
             </dl>
+            {breakdown && (breakdown.lines.utilityFees.length > 0 || breakdown.lines.manualFees.length > 0) && (
+              <div className="mt-3 pt-3 border-t border-slate-200">
+                <p className="text-xs font-semibold text-slate-600 mb-2">Rincian Tagihan</p>
+                <dl className="space-y-1 text-xs">
+                  <div className="flex justify-between">
+                    <dt className="text-slate-500">Sewa Kamar</dt>
+                    <dd>{formatCurrency(breakdown.lines.rent)}</dd>
+                  </div>
+                  {breakdown.lines.manualFees.map((f) => (
+                    <div key={f.name} className="flex justify-between">
+                      <dt className="text-slate-500">{f.name}</dt>
+                      <dd>{formatCurrency(f.amount)}</dd>
+                    </div>
+                  ))}
+                  {breakdown.lines.utilityFees.map((f) => (
+                    <div key={f.name} className="flex justify-between text-teal-700">
+                      <dt>{f.name}</dt>
+                      <dd>{formatCurrency(f.amount)}</dd>
+                    </div>
+                  ))}
+                </dl>
+                <p className="text-[11px] text-slate-400 mt-2">
+                  Pembayaran utility dialokasikan terlebih dahulu, sisanya ke sewa kamar.
+                </p>
+              </div>
+            )}
           </div>
 
           {isLunas ? (
