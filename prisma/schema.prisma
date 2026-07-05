@@ -72,6 +72,35 @@ enum BillingMethod {
   LUMPSUM
 }
 
+enum AssetStatus {
+  IN_WAREHOUSE
+  DEPLOYED
+  IN_USE
+  DAMAGED
+  MAINTENANCE
+  RETIRED
+}
+
+enum PurchaseStatus {
+  DRAFT
+  ORDERED
+  RECEIVED
+  CANCELLED
+}
+
+enum MaintenanceStatus {
+  OPEN
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum InspectionResult {
+  OK
+  DAMAGED
+  MISSING
+}
+
 model KosanProfile {
   id                      Int      @id @default(1)
   name                    String   @default("KosanKu") @db.VarChar(150)
@@ -132,6 +161,9 @@ model User {
 
   tenants       Tenant[]
   finances      Finance[] @relation("CreatedBy")
+  purchases     Purchase[] @relation("PurchaseCreatedBy")
+  assetMaintenances AssetMaintenance[] @relation("MaintenanceCreatedBy")
+  checkoutInspections CheckoutInspection[] @relation("InspectionBy")
 
   @@index([role])
   @@map("users")
@@ -154,6 +186,9 @@ model Room {
   finances      Finance[]
   roomUtilities RoomUtility[]
   utilityBills  UtilityBilling[]
+  roomAssets    RoomAsset[]
+  assetMaintenances AssetMaintenance[]
+  checkoutInspections CheckoutInspection[]
 
   @@index([status])
   @@map("rooms")
@@ -196,6 +231,9 @@ model Tenant {
   finances     Finance[]
   payments     Payment[]
   utilityBills UtilityBilling[]
+  roomAssets   RoomAsset[]
+  assetMaintenances AssetMaintenance[]
+  checkoutInspections CheckoutInspection[]
 
   @@index([status])
   @@index([userId])
@@ -238,6 +276,8 @@ model Finance {
   tenant    Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
   room      Room?   @relation(fields: [roomId], references: [id], onDelete: SetNull)
   createdByUser User? @relation("CreatedBy", fields: [createdBy], references: [id], onDelete: SetNull)
+  purchases Purchase[]
+  assetMaintenances AssetMaintenance[]
 
   @@index([type])
   @@index([transactionDate])
@@ -258,6 +298,7 @@ model Utility {
 
   roomUtilities RoomUtility[]
   billings      UtilityBilling[]
+  roomAssets    RoomAsset[]
 
   @@map("utilities")
 }
@@ -306,4 +347,205 @@ model UtilityBilling {
   @@index([periodYear, periodMonth])
   @@index([tenantId])
   @@map("utility_billings")
+}
+
+model InventoryCategory {
+  id          Int      @id @default(autoincrement())
+  name        String   @db.VarChar(100)
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  items InventoryItem[]
+
+  @@map("inventory_categories")
+}
+
+model InventoryItem {
+  id          Int      @id @default(autoincrement())
+  sku         String?  @unique @db.VarChar(50)
+  name        String   @db.VarChar(150)
+  categoryId  Int?     @map("category_id")
+  unit        String   @default("unit") @db.VarChar(20)
+  unitPrice   Decimal  @default(0) @map("unit_price") @db.Decimal(12, 2)
+  description String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  category         InventoryCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  warehouseStock   WarehouseStock?
+  assets           RoomAsset[]
+  purchaseItems    PurchaseItem[]
+  warehouseEntries WarehouseEntry[]
+
+  @@map("inventory_items")
+}
+
+model Supplier {
+  id        Int      @id @default(autoincrement())
+  name      String   @db.VarChar(150)
+  phone     String?  @db.VarChar(30)
+  email     String?  @db.VarChar(150)
+  address   String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  purchases Purchase[]
+
+  @@map("suppliers")
+}
+
+model Purchase {
+  id             Int            @id @default(autoincrement())
+  purchaseNumber String         @unique @map("purchase_number") @db.VarChar(30)
+  supplierId     Int?           @map("supplier_id")
+  purchaseDate   DateTime       @default(now()) @map("purchase_date") @db.Date
+  totalAmount    Decimal        @default(0) @map("total_amount") @db.Decimal(12, 2)
+  status         PurchaseStatus @default(DRAFT)
+  notes          String?
+  financeId      Int?           @map("finance_id")
+  receivedAt     DateTime?      @map("received_at")
+  createdBy      Int?           @map("created_by")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  supplier         Supplier?        @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  createdByUser    User?            @relation("PurchaseCreatedBy", fields: [createdBy], references: [id], onDelete: SetNull)
+  finance          Finance?         @relation(fields: [financeId], references: [id], onDelete: SetNull)
+  items            PurchaseItem[]
+  warehouseEntries WarehouseEntry[]
+
+  @@index([status])
+  @@map("purchases")
+}
+
+model PurchaseItem {
+  id         Int     @id @default(autoincrement())
+  purchaseId Int     @map("purchase_id")
+  itemId     Int     @map("item_id")
+  quantity   Int     @default(1)
+  unitPrice  Decimal @map("unit_price") @db.Decimal(12, 2)
+  totalPrice Decimal @map("total_price") @db.Decimal(12, 2)
+
+  purchase Purchase      @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  item     InventoryItem @relation(fields: [itemId], references: [id], onDelete: Restrict)
+
+  @@map("purchase_items")
+}
+
+model WarehouseStock {
+  id        Int      @id @default(autoincrement())
+  itemId    Int      @unique @map("item_id")
+  quantity  Int      @default(0)
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  item InventoryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@map("warehouse_stocks")
+}
+
+model WarehouseEntry {
+  id         Int      @id @default(autoincrement())
+  purchaseId Int?     @map("purchase_id")
+  itemId     Int      @map("item_id")
+  quantity   Int
+  entryDate  DateTime @default(now()) @map("entry_date") @db.Date
+  notes      String?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  purchase Purchase?     @relation(fields: [purchaseId], references: [id], onDelete: SetNull)
+  item     InventoryItem @relation(fields: [itemId], references: [id], onDelete: Restrict)
+
+  @@map("warehouse_entries")
+}
+
+model RoomAsset {
+  id            Int         @id @default(autoincrement())
+  assetCode     String      @unique @map("asset_code") @db.VarChar(30)
+  itemId        Int         @map("item_id")
+  roomId        Int?        @map("room_id")
+  tenantId      Int?        @map("tenant_id")
+  utilityId     Int?        @map("utility_id")
+  status        AssetStatus @default(IN_WAREHOUSE)
+  purchasePrice Decimal?    @map("purchase_price") @db.Decimal(12, 2)
+  deployedAt    DateTime?   @map("deployed_at")
+  notes         String?
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+
+  item         InventoryItem        @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  room         Room?                @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  tenant       Tenant?              @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  utility      Utility?             @relation(fields: [utilityId], references: [id], onDelete: SetNull)
+  maintenances AssetMaintenance[]
+  inspections  CheckoutInspection[]
+  transactions AssetTransaction[]
+
+  @@index([status])
+  @@index([roomId])
+  @@index([tenantId])
+  @@map("room_assets")
+}
+
+model AssetMaintenance {
+  id          Int               @id @default(autoincrement())
+  assetId     Int               @map("asset_id")
+  roomId      Int?              @map("room_id")
+  tenantId    Int?              @map("tenant_id")
+  title       String            @db.VarChar(200)
+  description String?
+  status      MaintenanceStatus @default(OPEN)
+  cost        Decimal           @default(0) @db.Decimal(12, 2)
+  reportedAt  DateTime          @default(now()) @map("reported_at")
+  completedAt DateTime?         @map("completed_at")
+  financeId   Int?              @map("finance_id")
+  createdBy   Int?              @map("created_by")
+
+  asset         RoomAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  room          Room?     @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  tenant        Tenant?   @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  createdByUser User?     @relation("MaintenanceCreatedBy", fields: [createdBy], references: [id], onDelete: SetNull)
+  finance       Finance?  @relation(fields: [financeId], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@map("asset_maintenances")
+}
+
+model CheckoutInspection {
+  id              Int              @id @default(autoincrement())
+  tenantId        Int              @map("tenant_id")
+  roomId          Int              @map("room_id")
+  assetId         Int              @map("asset_id")
+  result          InspectionResult @default(OK)
+  damageCost      Decimal          @default(0) @map("damage_cost") @db.Decimal(12, 2)
+  depositDeducted Decimal          @default(0) @map("deposit_deducted") @db.Decimal(12, 2)
+  notes           String?
+  inspectedAt     DateTime         @default(now()) @map("inspected_at")
+  inspectedBy     Int?             @map("inspected_by")
+
+  tenant          Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  room            Room      @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  asset           RoomAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  inspectedByUser User?     @relation("InspectionBy", fields: [inspectedBy], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@map("checkout_inspections")
+}
+
+model AssetTransaction {
+  id         Int          @id @default(autoincrement())
+  assetId    Int          @map("asset_id")
+  action     String       @db.VarChar(50)
+  fromStatus AssetStatus? @map("from_status")
+  toStatus   AssetStatus? @map("to_status")
+  roomId     Int?         @map("room_id")
+  tenantId   Int?         @map("tenant_id")
+  notes      String?
+  createdBy  Int?         @map("created_by")
+  createdAt  DateTime     @default(now()) @map("created_at")
+
+  asset RoomAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([assetId])
+  @@map("asset_transactions")
 }

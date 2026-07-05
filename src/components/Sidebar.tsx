@@ -16,6 +16,7 @@ import {
   Menu,
   X,
   Zap,
+  Package,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -58,6 +59,19 @@ const navigation = [
       { name: "Daftar Utility", href: "/utilitas" },
       { name: "Utility per Kamar", href: "/utilitas/kamar" },
       { name: "Tagihan Bulanan", href: "/utilitas/tagihan" },
+    ],
+  },
+  {
+    name: "Inventaris",
+    icon: Package,
+    children: [
+      { name: "Ringkasan", href: "/inventaris" },
+      { name: "Master Barang", href: "/inventaris/barang" },
+      { name: "Pembelian", href: "/inventaris/pembelian" },
+      { name: "Gudang", href: "/inventaris/gudang" },
+      { name: "Asset per Kamar", href: "/inventaris/kamar" },
+      { name: "Maintenance", href: "/inventaris/maintenance" },
+      { name: "Inspeksi Checkout", href: "/inventaris/inspeksi" },
     ],
   },
   { name: "Cetak Laporan", href: "/laporan", icon: FileText },

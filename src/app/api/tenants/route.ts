@@ -252,6 +252,11 @@ export async function POST(request: NextRequest) {
       });
     });
 
+    if (tenantStatus === "ACTIVE") {
+      const { activateRoomAssetsForTenant } = await import("@/lib/inventory-service");
+      await activateRoomAssetsForTenant(parseInt(roomId), tenant.id, session.userId).catch(() => {});
+    }
+
     return NextResponse.json(tenant, { status: 201 });
   } catch (error) {
     console.error("Tenants POST error:", error);
@@ -415,6 +420,8 @@ export async function PUT(request: NextRequest) {
         });
         return t;
       });
+      const { activateRoomAssetsForTenant } = await import("@/lib/inventory-service");
+      await activateRoomAssetsForTenant(tenant.roomId, parseInt(id), session.userId).catch(() => {});
       return NextResponse.json(updated);
     }
 

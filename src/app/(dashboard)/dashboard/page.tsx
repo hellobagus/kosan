@@ -9,6 +9,9 @@ import {
   Building,
   ArrowUpRight,
   ArrowDownRight,
+  Package,
+  Wrench,
+  AlertTriangle,
 } from "lucide-react";
 import { StatCard, Card, CardHeader, CardBody, Badge, PageHeader } from "@/components/ui";
 import { formatCurrency, formatShortDate } from "@/lib/utils";
@@ -23,6 +26,13 @@ interface DashboardData {
     monthlyExpense: number;
     yearlyIncome: number;
     occupancyRate: number;
+  };
+  inventory?: {
+    totalRooms: number;
+    totalAssets: number;
+    damagedAssets: number;
+    maintenanceOpen: number;
+    assetValue: number;
   };
   recentTenants: Array<{
     id: number;
@@ -166,6 +176,45 @@ export default function DashboardPage() {
           </CardBody>
         </Card>
       </div>
+
+      <Card className="mb-8">
+        <CardHeader>
+          <h3 className="font-semibold text-slate-900">Inventaris Kosan</h3>
+        </CardHeader>
+        <CardBody>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
+            <StatCard title="Total Kamar" value={data?.inventory?.totalRooms || stats?.totalRooms || 0} icon={DoorOpen} color="teal" />
+            <StatCard title="Total Asset" value={data?.inventory?.totalAssets || 0} icon={Package} color="blue" />
+            <StatCard title="Barang Rusak" value={data?.inventory?.damagedAssets || 0} icon={AlertTriangle} color="red" />
+            <StatCard title="Maintenance Open" value={data?.inventory?.maintenanceOpen || 0} icon={Wrench} color="amber" />
+            <StatCard title="Nilai Asset" value={formatCurrency(data?.inventory?.assetValue || 0)} icon={Wallet} color="purple" />
+          </div>
+          <table className="w-full text-sm">
+            <tbody>
+              <tr className="border-b border-slate-100">
+                <td className="py-2.5 text-slate-600 font-medium">Total Kamar</td>
+                <td className="py-2.5 text-right font-bold">{data?.inventory?.totalRooms || stats?.totalRooms || 0}</td>
+              </tr>
+              <tr className="border-b border-slate-100">
+                <td className="py-2.5 text-slate-600 font-medium">Total Asset</td>
+                <td className="py-2.5 text-right font-bold">{data?.inventory?.totalAssets || 0}</td>
+              </tr>
+              <tr className="border-b border-slate-100">
+                <td className="py-2.5 text-slate-600 font-medium">Barang Rusak</td>
+                <td className="py-2.5 text-right font-bold text-red-600">{data?.inventory?.damagedAssets || 0}</td>
+              </tr>
+              <tr className="border-b border-slate-100">
+                <td className="py-2.5 text-slate-600 font-medium">Maintenance Open</td>
+                <td className="py-2.5 text-right font-bold text-amber-600">{data?.inventory?.maintenanceOpen || 0}</td>
+              </tr>
+              <tr>
+                <td className="py-2.5 text-slate-600 font-medium">Nilai Asset</td>
+                <td className="py-2.5 text-right font-bold text-teal-600">{formatCurrency(data?.inventory?.assetValue || 0)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </CardBody>
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>

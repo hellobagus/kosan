@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
+import { getInventoryStats } from "@/lib/inventory-service";
 
 export async function GET() {
   try {
@@ -23,6 +24,7 @@ export async function GET() {
       yearlyIncome,
       recentTenants,
       recentFinances,
+      inventoryStats,
     ] = await Promise.all([
       prisma.room.count(),
       prisma.room.count({ where: { status: "OCCUPIED" } }),
@@ -51,6 +53,7 @@ export async function GET() {
         take: 5,
         include: { tenant: { include: { user: true } } },
       }),
+      getInventoryStats(),
     ]);
 
     return NextResponse.json({
@@ -66,6 +69,7 @@ export async function GET() {
       },
       recentTenants,
       recentFinances,
+      inventory: inventoryStats,
     });
   } catch (error) {
     console.error("Dashboard error:", error);
