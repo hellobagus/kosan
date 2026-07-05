@@ -18,16 +18,16 @@ interface InventoryStats {
 }
 
 const FLOW_STEPS = [
+  { label: "Master Barang", href: "/inventaris/barang", icon: Package },
+  { label: "Template Kamar", href: "/inventaris/template", icon: DoorOpen },
+  { label: "Area Bersama", href: "/inventaris/area-bersama", icon: Warehouse },
   { label: "Pembelian Barang", href: "/inventaris/pembelian", icon: ShoppingCart },
   { label: "Barang Masuk Gudang", href: "/inventaris/gudang", icon: Warehouse },
   { label: "Penempatan ke Kamar", href: "/inventaris/kamar", icon: DoorOpen },
   { label: "Check-In Penyewa", href: "/penghuni/aktif", icon: Users },
-  { label: "Penggunaan Barang", href: "/inventaris/kamar", icon: Package },
   { label: "Maintenance", href: "/inventaris/maintenance", icon: Wrench },
-  { label: "Check-Out Penyewa", href: "/penghuni/selesai", icon: Users },
-  { label: "Inspeksi Barang", href: "/inventaris/inspeksi", icon: ClipboardCheck },
+  { label: "Check-Out + Inspeksi", href: "/penghuni/aktif", icon: ClipboardCheck },
   { label: "Potong Deposit", href: "/inventaris/inspeksi", icon: AlertTriangle },
-  { label: "Barang Kembali Aktif", href: "/inventaris/kamar", icon: Package },
 ];
 
 export default function InventoryOverview() {

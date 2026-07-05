@@ -1,40 +1,58 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import {
   PageHeader, Card, CardBody, Table, Th, Td, Badge, EmptyState,
   Input, Select, Button, Textarea,
 } from "@/components/ui";
 import { formatCurrency } from "@/lib/utils";
+import { LOCATION_TYPE_LABELS } from "@/lib/inventory-service";
 
-interface Category { id: number; name: string; }
+interface Category {
+  id: number;
+  name: string;
+  locationType: keyof typeof LOCATION_TYPE_LABELS;
+}
+
 interface Item {
-  id: number; sku: string | null; name: string; categoryId: number | null;
-  unit: string; unitPrice: string; description: string | null; active: boolean;
+  id: number;
+  sku: string | null;
+  name: string;
+  categoryId: number | null;
+  locationType: keyof typeof LOCATION_TYPE_LABELS;
+  unit: string;
+  unitPrice: string;
+  description: string | null;
+  active: boolean;
   category: Category | null;
   warehouseStock: { quantity: number } | null;
   _count: { assets: number };
 }
 
-const EMPTY = { sku: "", name: "", categoryId: "", unit: "unit", unitPrice: "", description: "", active: true };
+const EMPTY = {
+  sku: "", name: "", categoryId: "", locationType: "ROOM",
+  unit: "unit", unitPrice: "", description: "", active: true,
+};
 
 export default function InventoryItemList() {
   const [items, setItems] = useState<Item[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
+  const [filterLocation, setFilterLocation] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [showCatForm, setShowCatForm] = useState(false);
   const [editing, setEditing] = useState<Item | null>(null);
   const [form, setForm] = useState(EMPTY);
-  const [catName, setCatName] = useState("");
+  const [catForm, setCatForm] = useState({ name: "", locationType: "ROOM" });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
   const fetchData = () => {
     setLoading(true);
+    const url = filterLocation ? `/api/inventory/items?locationType=${filterLocation}` : "/api/inventory/items";
     Promise.all([
-      fetch("/api/inventory/items").then((r) => r.json()),
+      fetch(url).then((r) => r.json()),
       fetch("/api/inventory/categories").then((r) => r.json()),
     ]).then(([itemsData, catData]) => {
       setItems(itemsData);
@@ -42,14 +60,21 @@ export default function InventoryItemList() {
     }).finally(() => setLoading(false));
   };
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => { fetchData(); }, [filterLocation]);
+
+  const filteredCategories = useMemo(
+    () => (form.locationType ? categories.filter((c) => c.locationType === form.locationType) : categories),
+    [categories, form.locationType]
+  );
 
   const openCreate = () => { setEditing(null); setForm(EMPTY); setError(""); setShowForm(true); };
   const openEdit = (item: Item) => {
     setEditing(item);
     setForm({
-      sku: item.sku || "", name: item.name, categoryId: item.categoryId ? String(item.categoryId) : "",
-      unit: item.unit, unitPrice: String(item.unitPrice), description: item.description || "", active: item.active,
+      sku: item.sku || "", name: item.name,
+      categoryId: item.categoryId ? String(item.categoryId) : "",
+      locationType: item.locationType, unit: item.unit,
+      unitPrice: String(item.unitPrice), description: item.description || "", active: item.active,
     });
     setError(""); setShowForm(true);
   };
@@ -74,20 +99,22 @@ export default function InventoryItemList() {
   };
 
   const handleAddCategory = async () => {
-    if (!catName) return;
+    if (!catForm.name) return;
     await fetch("/api/inventory/categories", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: catName }),
+      body: JSON.stringify(catForm),
     });
-    setCatName(""); setShowCatForm(false); fetchData();
+    setCatForm({ name: "", locationType: "ROOM" });
+    setShowCatForm(false);
+    fetchData();
   };
 
   return (
     <div>
       <PageHeader
         title="Master Barang"
-        description="Daftar barang inventaris kosan"
+        description="Daftar barang inventaris: kamar/unit, area bersama (dapur, laundry), dan fasilitas kosan"
         action={
           <div className="flex gap-2">
             <Button variant="secondary" onClick={() => setShowCatForm(true)}>+ Kategori</Button>
@@ -96,13 +123,29 @@ export default function InventoryItemList() {
         }
       />
 
+      <div className="flex flex-wrap gap-3 mb-6">
+        <Select value={filterLocation} onChange={(e) => setFilterLocation(e.target.value)} className="w-56">
+          <option value="">Semua Lokasi</option>
+          {Object.entries(LOCATION_TYPE_LABELS).filter(([k]) => k !== "WAREHOUSE").map(([k, v]) => (
+            <option key={k} value={k}>{v}</option>
+          ))}
+        </Select>
+      </div>
+
       {showCatForm && (
         <Card className="mb-6">
           <CardBody>
-            <div className="flex gap-3 items-end">
-              <Input label="Nama Kategori" value={catName} onChange={(e) => setCatName(e.target.value)} className="flex-1" />
-              <Button onClick={handleAddCategory}>Simpan</Button>
-              <Button variant="ghost" onClick={() => setShowCatForm(false)}>Batal</Button>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+              <Input label="Nama Kategori" value={catForm.name} onChange={(e) => setCatForm({ ...catForm, name: e.target.value })} />
+              <Select label="Lokasi" value={catForm.locationType} onChange={(e) => setCatForm({ ...catForm, locationType: e.target.value })}>
+                {Object.entries(LOCATION_TYPE_LABELS).filter(([k]) => k !== "WAREHOUSE").map(([k, v]) => (
+                  <option key={k} value={k}>{v}</option>
+                ))}
+              </Select>
+              <div className="flex gap-2">
+                <Button onClick={handleAddCategory}>Simpan</Button>
+                <Button variant="ghost" onClick={() => setShowCatForm(false)}>Batal</Button>
+              </div>
             </div>
           </CardBody>
         </Card>
@@ -114,9 +157,14 @@ export default function InventoryItemList() {
             <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Input label="SKU" value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} />
               <Input label="Nama Barang *" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+              <Select label="Lokasi Penempatan *" value={form.locationType} onChange={(e) => setForm({ ...form, locationType: e.target.value, categoryId: "" })}>
+                {Object.entries(LOCATION_TYPE_LABELS).filter(([k]) => k !== "WAREHOUSE").map(([k, v]) => (
+                  <option key={k} value={k}>{v}</option>
+                ))}
+              </Select>
               <Select label="Kategori" value={form.categoryId} onChange={(e) => setForm({ ...form, categoryId: e.target.value })}>
                 <option value="">-- Pilih --</option>
-                {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                {filteredCategories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </Select>
               <Input label="Satuan" value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} />
               <Input label="Harga Satuan" type="number" value={form.unitPrice} onChange={(e) => setForm({ ...form, unitPrice: e.target.value })} />
@@ -146,13 +194,14 @@ export default function InventoryItemList() {
           ) : (
             <Table>
               <thead><tr>
-                <Th>SKU</Th><Th>Nama</Th><Th>Kategori</Th><Th>Satuan</Th><Th>Harga</Th><Th>Stok Gudang</Th><Th>Total Asset</Th><Th>Status</Th><Th>Aksi</Th>
+                <Th>SKU</Th><Th>Nama</Th><Th>Lokasi</Th><Th>Kategori</Th><Th>Satuan</Th><Th>Harga</Th><Th>Stok Gudang</Th><Th>Total Asset</Th><Th>Status</Th><Th>Aksi</Th>
               </tr></thead>
               <tbody>
                 {items.map((item) => (
                   <tr key={item.id}>
                     <Td>{item.sku || "-"}</Td>
                     <Td className="font-medium">{item.name}</Td>
+                    <Td><Badge variant="info">{LOCATION_TYPE_LABELS[item.locationType]}</Badge></Td>
                     <Td>{item.category?.name || "-"}</Td>
                     <Td>{item.unit}</Td>
                     <Td>{formatCurrency(item.unitPrice)}</Td>

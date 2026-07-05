@@ -1,5 +1,12 @@
-import { AssetStatus, InspectionResult, MaintenanceStatus, Prisma, PurchaseStatus } from "@prisma/client";
+import { AssetStatus, InspectionResult, InventoryLocationType, MaintenanceStatus, Prisma, PurchaseStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+
+export const LOCATION_TYPE_LABELS: Record<InventoryLocationType, string> = {
+  WAREHOUSE: "Gudang",
+  ROOM: "Dalam Kamar/Unit",
+  SHARED: "Area Bersama",
+  BUILDING: "Fasilitas Kosan",
+};
 
 export const ASSET_STATUS_LABELS: Record<AssetStatus, string> = {
   IN_WAREHOUSE: "Di Gudang",
@@ -153,10 +160,16 @@ export async function deployAssetToRoom(
   userId?: number
 ) {
   return prisma.$transaction(async (tx) => {
-    const asset = await tx.roomAsset.findUnique({ where: { id: assetId } });
+    const asset = await tx.roomAsset.findUnique({
+      where: { id: assetId },
+      include: { item: true },
+    });
     if (!asset) throw new Error("Asset tidak ditemukan");
     if (asset.status !== "IN_WAREHOUSE") {
       throw new Error("Asset harus berada di gudang untuk ditempatkan ke kamar");
+    }
+    if (asset.item.locationType !== "ROOM") {
+      throw new Error("Barang ini untuk area bersama/fasilitas, gunakan penempatan area bersama");
     }
 
     const stock = await tx.warehouseStock.findUnique({ where: { itemId: asset.itemId } });
@@ -171,6 +184,7 @@ export async function deployAssetToRoom(
       where: { id: assetId },
       data: {
         roomId,
+        sharedAreaId: null,
         utilityId: utilityId || null,
         status: "DEPLOYED",
         deployedAt: new Date(),
@@ -185,6 +199,61 @@ export async function deployAssetToRoom(
       toStatus: "DEPLOYED",
       roomId,
       notes: `Ditempatkan ke kamar ${updated.room?.roomNumber}`,
+      createdBy: userId,
+    });
+
+    return updated;
+  });
+}
+
+export async function deployAssetToSharedArea(
+  assetId: number,
+  sharedAreaId: number,
+  userId?: number
+) {
+  return prisma.$transaction(async (tx) => {
+    const asset = await tx.roomAsset.findUnique({
+      where: { id: assetId },
+      include: { item: true },
+    });
+    if (!asset) throw new Error("Asset tidak ditemukan");
+    if (asset.status !== "IN_WAREHOUSE") {
+      throw new Error("Asset harus berada di gudang untuk ditempatkan");
+    }
+    if (!["SHARED", "BUILDING"].includes(asset.item.locationType)) {
+      throw new Error("Barang ini untuk kamar/unit, gunakan penempatan ke kamar");
+    }
+
+    const area = await tx.sharedArea.findUnique({ where: { id: sharedAreaId } });
+    if (!area) throw new Error("Area bersama tidak ditemukan");
+
+    const stock = await tx.warehouseStock.findUnique({ where: { itemId: asset.itemId } });
+    if (!stock || stock.quantity < 1) throw new Error("Stok gudang tidak mencukupi");
+
+    await tx.warehouseStock.update({
+      where: { itemId: asset.itemId },
+      data: { quantity: stock.quantity - 1 },
+    });
+
+    const updated = await tx.roomAsset.update({
+      where: { id: assetId },
+      data: {
+        roomId: null,
+        sharedAreaId,
+        tenantId: null,
+        utilityId: null,
+        status: "DEPLOYED",
+        deployedAt: new Date(),
+      },
+      include: { item: true, sharedArea: true },
+    });
+
+    await logTransaction(tx, {
+      assetId,
+      action: "DEPLOY_TO_SHARED",
+      fromStatus: "IN_WAREHOUSE",
+      toStatus: "DEPLOYED",
+      notes: `Ditempatkan ke ${area.name}`,
       createdBy: userId,
     });
 
@@ -426,6 +495,143 @@ export async function inspectCheckoutAssets(
 
     return { inspections: results, totalDeduction };
   });
+}
+
+export async function getTenantCheckoutAssets(tenantId: number) {
+  const tenant = await prisma.tenant.findUnique({
+    where: { id: tenantId },
+    include: {
+      user: { select: { name: true } },
+      room: { include: { template: { include: { items: { include: { item: true } } } } } },
+    },
+  });
+  if (!tenant) throw new Error("Penghuni tidak ditemukan");
+
+  const assets = await prisma.roomAsset.findMany({
+    where: {
+      roomId: tenant.roomId,
+      status: { in: ["IN_USE", "DEPLOYED"] },
+      OR: [{ tenantId }, { tenantId: null }],
+    },
+    include: { item: { include: { category: true } } },
+    orderBy: { assetCode: "asc" },
+  });
+
+  const templateCompliance = await getRoomTemplateCompliance(tenant.roomId);
+
+  return {
+    tenant: {
+      id: tenant.id,
+      deposit: Number(tenant.deposit),
+      checkoutInspectionAt: tenant.checkoutInspectionAt,
+      user: tenant.user,
+      room: tenant.room,
+    },
+    assets,
+    templateCompliance,
+    requiresInspection: assets.length > 0,
+  };
+}
+
+export async function getRoomTemplateCompliance(roomId: number) {
+  const room = await prisma.room.findUnique({
+    where: { id: roomId },
+    include: {
+      template: { include: { items: { include: { item: true } } } },
+    },
+  });
+  if (!room?.template) {
+    return { hasTemplate: false, complete: true, items: [] as Array<{ itemId: number; itemName: string; required: number; actual: number; missing: number }> };
+  }
+
+  const deployed = await prisma.roomAsset.groupBy({
+    by: ["itemId"],
+    where: {
+      roomId,
+      status: { in: ["DEPLOYED", "IN_USE", "DAMAGED", "MAINTENANCE"] },
+    },
+    _count: { id: true },
+  });
+  const deployedMap = new Map(deployed.map((d) => [d.itemId, d._count.id]));
+
+  const items = room.template.items.map((ti) => {
+    const actual = deployedMap.get(ti.itemId) || 0;
+    const missing = Math.max(0, ti.quantity - actual);
+    return {
+      itemId: ti.itemId,
+      itemName: ti.item.name,
+      required: ti.quantity,
+      actual,
+      missing,
+      isRequired: ti.required,
+    };
+  });
+
+  const complete = items.filter((i) => i.isRequired).every((i) => i.missing === 0);
+
+  return { hasTemplate: true, templateName: room.template.name, complete, items };
+}
+
+export async function checkoutTenantWithInspection(
+  tenantId: number,
+  checkOut: Date,
+  inspections: Array<{
+    assetId: number;
+    result: InspectionResult;
+    damageCost?: number;
+    notes?: string;
+  }>,
+  userId?: number
+) {
+  const readiness = await getTenantCheckoutAssets(tenantId);
+  if (readiness.requiresInspection) {
+    if (!inspections || inspections.length === 0) {
+      throw new Error("Inspeksi inventaris wajib dilakukan sebelum checkout");
+    }
+    const assetIds = new Set(readiness.assets.map((a) => a.id));
+    for (const insp of inspections) {
+      if (!assetIds.has(insp.assetId)) {
+        throw new Error("Asset inspeksi tidak valid untuk penghuni ini");
+      }
+    }
+    if (inspections.length < readiness.assets.length) {
+      throw new Error("Semua barang di kamar harus diinspeksi");
+    }
+  }
+
+  let inspectionResult: Awaited<ReturnType<typeof inspectCheckoutAssets>> = {
+    inspections: [],
+    totalDeduction: 0,
+  };
+
+  if (readiness.requiresInspection && inspections.length > 0) {
+    inspectionResult = await inspectCheckoutAssets(tenantId, inspections, userId);
+  }
+
+  const updated = await prisma.$transaction(async (tx) => {
+    const tenant = await tx.tenant.findUnique({ where: { id: tenantId } });
+    if (!tenant) throw new Error("Penghuni tidak ditemukan");
+    if (tenant.status !== "ACTIVE") throw new Error("Penghuni tidak aktif");
+
+    const t = await tx.tenant.update({
+      where: { id: tenantId },
+      data: {
+        status: "COMPLETED",
+        checkOut,
+        checkoutInspectionAt: readiness.requiresInspection ? new Date() : tenant.checkoutInspectionAt,
+      },
+      include: { user: true, room: true },
+    });
+
+    await tx.room.update({
+      where: { id: tenant.roomId },
+      data: { status: "AVAILABLE" },
+    });
+
+    return t;
+  });
+
+  return { tenant: updated, ...inspectionResult };
 }
 
 export async function reactivateAsset(assetId: number, userId?: number) {

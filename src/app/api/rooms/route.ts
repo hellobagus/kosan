@@ -12,6 +12,7 @@ export async function GET(request: NextRequest) {
     const rooms = await prisma.room.findMany({
       where,
       include: {
+        template: { select: { id: true, name: true } },
         tenants: {
           where: { status: "ACTIVE" },
           include: { user: true },

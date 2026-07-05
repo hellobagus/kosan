@@ -279,24 +279,16 @@ export async function PUT(request: NextRequest) {
 
     if (!tenant) return NextResponse.json({ error: "Penghuni tidak ditemukan" }, { status: 404 });
 
-    if (action === "checkout") {
-      const { checkOut } = body;
-      const updated = await prisma.$transaction(async (tx) => {
-        const t = await tx.tenant.update({
-          where: { id: parseInt(id) },
-          data: {
-            status: "COMPLETED",
-            checkOut: checkOut ? new Date(checkOut) : new Date(),
-          },
-          include: { user: true, room: true },
-        });
-        await tx.room.update({
-          where: { id: tenant.roomId },
-          data: { status: "AVAILABLE" },
-        });
-        return t;
-      });
-      return NextResponse.json(updated);
+    if (action === "checkout" || action === "checkout_with_inspection") {
+      const { checkOut, inspections } = body;
+      const { checkoutTenantWithInspection } = await import("@/lib/inventory-service");
+      const result = await checkoutTenantWithInspection(
+        parseInt(id),
+        checkOut ? new Date(checkOut) : new Date(),
+        inspections || [],
+        session.userId
+      );
+      return NextResponse.json(result);
     }
 
     if (action === "extend") {
@@ -440,24 +432,16 @@ export async function PUT(request: NextRequest) {
     }
 
     // Legacy checkout without action
-    const { checkOut, status } = body;
+    const { checkOut, status, inspections } = body;
     if (status === "COMPLETED") {
-      const updated = await prisma.$transaction(async (tx) => {
-        const t = await tx.tenant.update({
-          where: { id: parseInt(id) },
-          data: {
-            status: "COMPLETED",
-            checkOut: checkOut ? new Date(checkOut) : new Date(),
-          },
-          include: { user: true, room: true },
-        });
-        await tx.room.update({
-          where: { id: tenant.roomId },
-          data: { status: "AVAILABLE" },
-        });
-        return t;
-      });
-      return NextResponse.json(updated);
+      const { checkoutTenantWithInspection } = await import("@/lib/inventory-service");
+      const result = await checkoutTenantWithInspection(
+        parseInt(id),
+        checkOut ? new Date(checkOut) : new Date(),
+        inspections || [],
+        session.userId
+      );
+      return NextResponse.json(result.tenant);
     }
 
     return NextResponse.json({ error: "Aksi tidak valid" }, { status: 400 });

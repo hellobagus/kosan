@@ -13,8 +13,16 @@ interface Asset {
   purchasePrice: string | null; deployedAt: string | null;
   item: { name: string; category: { name: string } | null };
   room: { id: number; roomNumber: string } | null;
+  sharedArea: { id: number; name: string } | null;
   tenant: { id: number; user: { name: string } } | null;
   utility: { utilityName: string } | null;
+}
+
+interface TemplateCompliance {
+  hasTemplate: boolean;
+  complete: boolean;
+  templateName?: string;
+  items: Array<{ itemName: string; required: number; actual: number; missing: number; isRequired: boolean }>;
 }
 
 const STATUS_VARIANT: Record<string, "default" | "success" | "warning" | "danger" | "info"> = {
@@ -28,6 +36,7 @@ export default function RoomAssetBoard() {
   const [loading, setLoading] = useState(true);
   const [filterRoom, setFilterRoom] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
+  const [compliance, setCompliance] = useState<TemplateCompliance | null>(null);
   const [reporting, setReporting] = useState<number | null>(null);
   const [maintForm, setMaintForm] = useState({ title: "", description: "" });
 
@@ -44,6 +53,13 @@ export default function RoomAssetBoard() {
   };
 
   useEffect(() => { fetchData(); }, [filterRoom, filterStatus]);
+
+  useEffect(() => {
+    if (!filterRoom) { setCompliance(null); return; }
+    fetch(`/api/inventory/templates?roomId=${filterRoom}`)
+      .then((r) => r.json())
+      .then(setCompliance);
+  }, [filterRoom]);
 
   const handleReactivate = async (id: number) => {
     await fetch("/api/inventory/assets", {
@@ -81,6 +97,23 @@ export default function RoomAssetBoard() {
         </Select>
       </div>
 
+      {compliance?.hasTemplate && (
+        <Card className={`mb-6 border ${compliance.complete ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50"}`}>
+          <CardBody>
+            <p className="font-medium text-slate-900">
+              Template: {compliance.templateName} — {compliance.complete ? "Kelengkapan OK" : "Ada barang kurang"}
+            </p>
+            {!compliance.complete && (
+              <ul className="mt-2 text-sm text-amber-800 list-disc pl-5">
+                {compliance.items.filter((i) => i.missing > 0 && i.isRequired).map((i) => (
+                  <li key={i.itemName}>{i.itemName}: kurang {i.missing} (wajib {i.required}, ada {i.actual})</li>
+                ))}
+              </ul>
+            )}
+          </CardBody>
+        </Card>
+      )}
+
       <Card><CardBody className="p-0">
         {loading ? (
           <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600" /></div>
@@ -89,7 +122,7 @@ export default function RoomAssetBoard() {
         ) : (
           <Table>
             <thead><tr>
-              <Th>Kode</Th><Th>Barang</Th><Th>Kamar</Th><Th>Penghuni</Th><Th>Utility</Th>
+              <Th>Kode</Th><Th>Barang</Th><Th>Kamar</Th><Th>Area Bersama</Th><Th>Penghuni</Th><Th>Utility</Th>
               <Th>Status</Th><Th>Nilai</Th><Th>Aksi</Th>
             </tr></thead>
             <tbody>
@@ -98,6 +131,7 @@ export default function RoomAssetBoard() {
                   <Td className="font-mono text-sm">{a.assetCode}</Td>
                   <Td className="font-medium">{a.item.name}</Td>
                   <Td>{a.room ? `Kamar ${a.room.roomNumber}` : "-"}</Td>
+                  <Td>{a.sharedArea?.name || "-"}</Td>
                   <Td>{a.tenant?.user.name || "-"}</Td>
                   <Td>{a.utility?.utilityName || "-"}</Td>
                   <Td><Badge variant={STATUS_VARIANT[a.status]}>{ASSET_STATUS_LABELS[a.status]}</Badge></Td>

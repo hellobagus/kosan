@@ -101,6 +101,13 @@ enum InspectionResult {
   MISSING
 }
 
+enum InventoryLocationType {
+  WAREHOUSE
+  ROOM
+  SHARED
+  BUILDING
+}
+
 model KosanProfile {
   id                      Int      @id @default(1)
   name                    String   @default("KosanKu") @db.VarChar(150)
@@ -186,11 +193,15 @@ model Room {
   finances      Finance[]
   roomUtilities RoomUtility[]
   utilityBills  UtilityBilling[]
+  templateId    Int?           @map("template_id")
   roomAssets    RoomAsset[]
   assetMaintenances AssetMaintenance[]
   checkoutInspections CheckoutInspection[]
 
+  template RoomTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+
   @@index([status])
+  @@index([templateId])
   @@map("rooms")
 }
 
@@ -222,6 +233,7 @@ model Tenant {
   additionalOccupants  Json?         @map("additional_occupants")
   termsAcceptedAt      DateTime?     @map("terms_accepted_at")
   contractRequested    Boolean       @default(false) @map("contract_requested")
+  checkoutInspectionAt DateTime?     @map("checkout_inspection_at")
   notes                String?
   createdAt            DateTime      @default(now()) @map("created_at")
   updatedAt       DateTime      @updatedAt @map("updated_at")
@@ -350,10 +362,11 @@ model UtilityBilling {
 }
 
 model InventoryCategory {
-  id          Int      @id @default(autoincrement())
-  name        String   @db.VarChar(100)
-  description String?
-  createdAt   DateTime @default(now()) @map("created_at")
+  id           Int                   @id @default(autoincrement())
+  name         String                @db.VarChar(100)
+  description  String?
+  locationType InventoryLocationType @default(ROOM) @map("location_type")
+  createdAt    DateTime              @default(now()) @map("created_at")
 
   items InventoryItem[]
 
@@ -361,24 +374,67 @@ model InventoryCategory {
 }
 
 model InventoryItem {
-  id          Int      @id @default(autoincrement())
-  sku         String?  @unique @db.VarChar(50)
-  name        String   @db.VarChar(150)
-  categoryId  Int?     @map("category_id")
-  unit        String   @default("unit") @db.VarChar(20)
-  unitPrice   Decimal  @default(0) @map("unit_price") @db.Decimal(12, 2)
-  description String?
-  active      Boolean  @default(true)
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id           Int                   @id @default(autoincrement())
+  sku          String?               @unique @db.VarChar(50)
+  name         String                @db.VarChar(150)
+  categoryId   Int?                  @map("category_id")
+  locationType InventoryLocationType @default(ROOM) @map("location_type")
+  unit         String                @default("unit") @db.VarChar(20)
+  unitPrice    Decimal               @default(0) @map("unit_price") @db.Decimal(12, 2)
+  description  String?
+  active       Boolean               @default(true)
+  createdAt    DateTime              @default(now()) @map("created_at")
+  updatedAt    DateTime              @updatedAt @map("updated_at")
 
   category         InventoryCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   warehouseStock   WarehouseStock?
   assets           RoomAsset[]
   purchaseItems    PurchaseItem[]
   warehouseEntries WarehouseEntry[]
+  templateItems    RoomTemplateItem[]
 
+  @@index([locationType])
   @@map("inventory_items")
+}
+
+model SharedArea {
+  id          Int      @id @default(autoincrement())
+  name        String   @db.VarChar(100)
+  description String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  assets RoomAsset[]
+
+  @@map("shared_areas")
+}
+
+model RoomTemplate {
+  id          Int      @id @default(autoincrement())
+  name        String   @db.VarChar(100)
+  description String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  items RoomTemplateItem[]
+  rooms Room[]
+
+  @@map("room_templates")
+}
+
+model RoomTemplateItem {
+  id         Int     @id @default(autoincrement())
+  templateId Int     @map("template_id")
+  itemId     Int     @map("item_id")
+  quantity   Int     @default(1)
+  required   Boolean @default(true)
+
+  template RoomTemplate  @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  item     InventoryItem @relation(fields: [itemId], references: [id], onDelete: Restrict)
+
+  @@unique([templateId, itemId])
+  @@map("room_template_items")
 }
 
 model Supplier {
@@ -464,6 +520,7 @@ model RoomAsset {
   assetCode     String      @unique @map("asset_code") @db.VarChar(30)
   itemId        Int         @map("item_id")
   roomId        Int?        @map("room_id")
+  sharedAreaId  Int?        @map("shared_area_id")
   tenantId      Int?        @map("tenant_id")
   utilityId     Int?        @map("utility_id")
   status        AssetStatus @default(IN_WAREHOUSE)
@@ -475,6 +532,7 @@ model RoomAsset {
 
   item         InventoryItem        @relation(fields: [itemId], references: [id], onDelete: Restrict)
   room         Room?                @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  sharedArea   SharedArea?          @relation(fields: [sharedAreaId], references: [id], onDelete: SetNull)
   tenant       Tenant?              @relation(fields: [tenantId], references: [id], onDelete: SetNull)
   utility      Utility?             @relation(fields: [utilityId], references: [id], onDelete: SetNull)
   maintenances AssetMaintenance[]
@@ -483,6 +541,7 @@ model RoomAsset {
 
   @@index([status])
   @@index([roomId])
+  @@index([sharedAreaId])
   @@index([tenantId])
   @@map("room_assets")
 }

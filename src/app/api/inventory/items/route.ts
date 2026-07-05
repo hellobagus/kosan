@@ -2,15 +2,21 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url);
+    const locationType = searchParams.get("locationType");
+
+    const where = locationType ? { locationType: locationType as "WAREHOUSE" | "ROOM" | "SHARED" | "BUILDING" } : {};
+
     const items = await prisma.inventoryItem.findMany({
+      where,
       include: {
         category: true,
         warehouseStock: true,
         _count: { select: { assets: true } },
       },
-      orderBy: { name: "asc" },
+      orderBy: [{ locationType: "asc" }, { name: "asc" }],
     });
     return NextResponse.json(items);
   } catch (error) {
@@ -24,7 +30,7 @@ export async function POST(request: NextRequest) {
     const session = await getSession();
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { sku, name, categoryId, unit, unitPrice, description, active } = await request.json();
+    const { sku, name, categoryId, locationType, unit, unitPrice, description, active } = await request.json();
     if (!name) return NextResponse.json({ error: "Nama barang wajib diisi" }, { status: 400 });
 
     const item = await prisma.inventoryItem.create({
@@ -32,6 +38,7 @@ export async function POST(request: NextRequest) {
         sku: sku || null,
         name,
         categoryId: categoryId ? parseInt(categoryId) : null,
+        locationType: locationType || "ROOM",
         unit: unit || "unit",
         unitPrice: parseFloat(unitPrice || 0),
         description: description || null,
@@ -51,7 +58,7 @@ export async function PUT(request: NextRequest) {
     const session = await getSession();
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { id, sku, name, categoryId, unit, unitPrice, description, active } = await request.json();
+    const { id, sku, name, categoryId, locationType, unit, unitPrice, description, active } = await request.json();
     if (!id || !name) return NextResponse.json({ error: "Data wajib belum lengkap" }, { status: 400 });
 
     const item = await prisma.inventoryItem.update({
@@ -60,6 +67,7 @@ export async function PUT(request: NextRequest) {
         sku: sku || null,
         name,
         categoryId: categoryId ? parseInt(categoryId) : null,
+        locationType: locationType || undefined,
         unit: unit || "unit",
         unitPrice: parseFloat(unitPrice || 0),
         description: description || null,

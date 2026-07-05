@@ -96,6 +96,12 @@ export default function TenantBoard({ defaultTab = "ACTIVE" }: { defaultTab?: Ta
 
   // Form states
   const [checkoutDate, setCheckoutDate] = useState("");
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [checkoutError, setCheckoutError] = useState("");
+  const [checkoutAssets, setCheckoutAssets] = useState<Array<{ id: number; assetCode: string; item: { name: string } }>>([]);
+  const [checkoutInspRows, setCheckoutInspRows] = useState<Array<{ assetId: number; result: string; damageCost: string; notes: string }>>([]);
+  const [checkoutRequiresInspection, setCheckoutRequiresInspection] = useState(false);
+  const [checkoutDeposit, setCheckoutDeposit] = useState(0);
   const [extendForm, setExtendForm] = useState({
     leaseDuration: "", occupantCount: "1", discount: "0", additionalFees: [] as AdditionalFee[],
   });
@@ -144,7 +150,26 @@ export default function TenantBoard({ defaultTab = "ACTIVE" }: { defaultTab?: Ta
     setSelected(tenant);
     setModal(type);
     setAgreed(false);
-    if (type === "checkout") setCheckoutDate(toDateInput(new Date()));
+    if (type === "checkout") {
+      setCheckoutDate(toDateInput(new Date()));
+      setCheckoutLoading(true);
+      setCheckoutError("");
+      fetch(`/api/inventory/checkout-readiness?tenantId=${tenant.id}`)
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.error) {
+            setCheckoutError(data.error);
+            return;
+          }
+          setCheckoutRequiresInspection(data.requiresInspection);
+          setCheckoutDeposit(data.tenant?.deposit || 0);
+          setCheckoutAssets(data.assets || []);
+          setCheckoutInspRows((data.assets || []).map((a: { id: number }) => ({
+            assetId: a.id, result: "OK", damageCost: "0", notes: "",
+          })));
+        })
+        .finally(() => setCheckoutLoading(false));
+    }
     if (type === "extend") {
       setExtendForm({
         leaseDuration: "", occupantCount: String(tenant.occupantCount),
@@ -180,16 +205,49 @@ export default function TenantBoard({ defaultTab = "ACTIVE" }: { defaultTab?: Ta
 
   const handleCheckout = async () => {
     if (!selected || !agreed || !checkoutDate) return;
+    if (checkoutRequiresInspection && checkoutInspRows.length === 0) {
+      setCheckoutError("Inspeksi inventaris wajib dilakukan");
+      return;
+    }
     setSaving(true);
-    await fetch("/api/tenants", {
+    setCheckoutError("");
+    const res = await fetch("/api/tenants", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: selected.id, action: "checkout", checkOut: checkoutDate }),
+      body: JSON.stringify({
+        id: selected.id,
+        action: "checkout",
+        checkOut: checkoutDate,
+        inspections: checkoutInspRows.map((r) => ({
+          assetId: r.assetId,
+          result: r.result,
+          damageCost: parseFloat(r.damageCost || "0"),
+          notes: r.notes || undefined,
+        })),
+      }),
     });
+    const data = await res.json();
+    if (!res.ok) {
+      setCheckoutError(data.error || "Gagal checkout");
+      setSaving(false);
+      return;
+    }
+    if (data.totalDeduction > 0) {
+      alert(`Checkout selesai. Potong deposit: ${formatCurrency(data.totalDeduction)}`);
+    }
     setSaving(false);
     closeModal();
     fetchTenants();
   };
+
+  const updateCheckoutRow = (assetId: number, field: string, value: string) => {
+    setCheckoutInspRows((rows) => rows.map((r) => r.assetId === assetId ? { ...r, [field]: value } : r));
+  };
+
+  const checkoutDeduction = checkoutInspRows.reduce((sum, r) => {
+    if (r.result !== "OK") return sum + parseFloat(r.damageCost || "0");
+    return sum;
+  }, 0);
 
   const handleExtend = async () => {
     if (!selected || !agreed || !extendForm.leaseDuration) return;
@@ -558,10 +616,11 @@ export default function TenantBoard({ defaultTab = "ACTIVE" }: { defaultTab?: Ta
       )}
 
       {modal === "checkout" && selected && (
-        <Modal title="PROSES PENGHUNI SELESAI" onClose={closeModal}>
+        <Modal title="PROSES PENGHUNI SELESAI" onClose={closeModal} wide>
           <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-center mb-4">
             <p className="font-bold text-lg">{selected.user.name}</p>
             <p className="text-sm text-slate-600">Kamar: {selected.room.roomNumber}</p>
+            <p className="text-sm text-slate-600 mt-1">Deposit: {formatCurrency(checkoutDeposit || selected.deposit)}</p>
           </div>
           {(() => {
             const penalty = calcLatePenalty(selected.dueDate ? new Date(selected.dueDate) : null);
@@ -577,6 +636,59 @@ export default function TenantBoard({ defaultTab = "ACTIVE" }: { defaultTab?: Ta
               </div>
             ) : null;
           })()}
+
+          {checkoutLoading ? (
+            <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-teal-600" /></div>
+          ) : checkoutRequiresInspection ? (
+            <div className="mb-4">
+              <h3 className="font-semibold text-slate-900 mb-2">Inspeksi Inventaris Kamar *</h3>
+              <p className="text-xs text-slate-500 mb-3">Periksa semua barang di kamar sebelum penghuni keluar. Wajib diisi jika kamar memiliki asset.</p>
+              <div className="overflow-x-auto border border-slate-200 rounded-lg">
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-50">
+                    <tr>
+                      <th className="px-3 py-2 text-left">Barang</th>
+                      <th className="px-3 py-2 text-left">Kode</th>
+                      <th className="px-3 py-2 text-left">Hasil</th>
+                      <th className="px-3 py-2 text-left">Biaya</th>
+                      <th className="px-3 py-2 text-left">Catatan</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {checkoutInspRows.map((row) => {
+                      const asset = checkoutAssets.find((a) => a.id === row.assetId);
+                      return (
+                        <tr key={row.assetId} className="border-t border-slate-100">
+                          <td className="px-3 py-2">{asset?.item.name}</td>
+                          <td className="px-3 py-2 font-mono text-xs">{asset?.assetCode}</td>
+                          <td className="px-3 py-2">
+                            <Select value={row.result} onChange={(e) => updateCheckoutRow(row.assetId, "result", e.target.value)}>
+                              <option value="OK">Baik</option>
+                              <option value="DAMAGED">Rusak</option>
+                              <option value="MISSING">Hilang</option>
+                            </Select>
+                          </td>
+                          <td className="px-3 py-2">
+                            <Input type="number" value={row.damageCost} disabled={row.result === "OK"}
+                              onChange={(e) => updateCheckoutRow(row.assetId, "damageCost", e.target.value)} />
+                          </td>
+                          <td className="px-3 py-2">
+                            <Input value={row.notes} onChange={(e) => updateCheckoutRow(row.assetId, "notes", e.target.value)} placeholder="Catatan" />
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              {checkoutDeduction > 0 && (
+                <p className="text-sm text-red-600 mt-2">Estimasi potong deposit: <strong>{formatCurrency(checkoutDeduction)}</strong></p>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-slate-500 mb-4">Kamar ini tidak memiliki asset inventaris — checkout tanpa inspeksi barang.</p>
+          )}
+
           <Input label="Tanggal Keluar *" type="date" value={checkoutDate}
             onChange={(e) => setCheckoutDate(e.target.value)} />
           <p className="text-xs text-center text-slate-500 mt-4">
@@ -587,8 +699,9 @@ export default function TenantBoard({ defaultTab = "ACTIVE" }: { defaultTab?: Ta
             <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} />
             Setuju<span className="text-red-500">*</span>
           </label>
+          {checkoutError && <p className="text-red-500 text-sm text-center mt-2">{checkoutError}</p>}
           <div className="flex gap-3 mt-6">
-            <Button variant="danger" className="flex-1" disabled={!agreed || saving} onClick={handleCheckout}>
+            <Button variant="danger" className="flex-1" disabled={!agreed || saving || checkoutLoading} onClick={handleCheckout}>
               <LogOut className="w-4 h-4" /> Proses Selesai
             </Button>
             <Button variant="secondary" className="flex-1" onClick={closeModal}>

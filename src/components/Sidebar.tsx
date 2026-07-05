@@ -67,6 +67,8 @@ const navigation = [
     children: [
       { name: "Ringkasan", href: "/inventaris" },
       { name: "Master Barang", href: "/inventaris/barang" },
+      { name: "Template Kamar", href: "/inventaris/template" },
+      { name: "Area Bersama", href: "/inventaris/area-bersama" },
       { name: "Pembelian", href: "/inventaris/pembelian" },
       { name: "Gudang", href: "/inventaris/gudang" },
       { name: "Asset per Kamar", href: "/inventaris/kamar" },

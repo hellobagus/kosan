@@ -304,6 +304,115 @@ async function main() {
     }
   }
 
+  // --- Inventaris: kategori, master barang, area bersama, template kamar ---
+  const invCategories = [
+    { name: "Furnitur Kamar", locationType: "ROOM" as const, description: "Barang dalam kamar/unit" },
+    { name: "Elektronik Kamar", locationType: "ROOM" as const, description: "AC, kipas, TV di kamar" },
+    { name: "Perlengkapan Kamar", locationType: "ROOM" as const, description: "Sprei, bantal, tirai" },
+    { name: "Dapur Bersama", locationType: "SHARED" as const, description: "Peralatan dapur bersama" },
+    { name: "Laundry", locationType: "SHARED" as const, description: "Mesin cuci, jemuran" },
+    { name: "Fasilitas Umum", locationType: "BUILDING" as const, description: "CCTV, pompa air, genset" },
+  ];
+
+  const categoryMap: Record<string, number> = {};
+  for (const cat of invCategories) {
+    const existing = await prisma.inventoryCategory.findFirst({ where: { name: cat.name } });
+    const row = existing || await prisma.inventoryCategory.create({ data: cat });
+    categoryMap[cat.name] = row.id;
+  }
+
+  const invItems = [
+    { sku: "KSR-001", name: "Kasur 120x200", category: "Furnitur Kamar", locationType: "ROOM" as const, unit: "unit", unitPrice: 1500000 },
+    { sku: "ALM-001", name: "Lemari Pakaian", category: "Furnitur Kamar", locationType: "ROOM" as const, unit: "unit", unitPrice: 800000 },
+    { sku: "MEJ-001", name: "Meja Belajar", category: "Furnitur Kamar", locationType: "ROOM" as const, unit: "unit", unitPrice: 350000 },
+    { sku: "KRS-001", name: "Kursi", category: "Furnitur Kamar", locationType: "ROOM" as const, unit: "unit", unitPrice: 200000 },
+    { sku: "LMP-001", name: "Lampu Kamar", category: "Elektronik Kamar", locationType: "ROOM" as const, unit: "unit", unitPrice: 75000 },
+    { sku: "AC-001", name: "AC Split 1/2 PK", category: "Elektronik Kamar", locationType: "ROOM" as const, unit: "unit", unitPrice: 3500000 },
+    { sku: "KIP-001", name: "Kipas Angin", category: "Elektronik Kamar", locationType: "ROOM" as const, unit: "unit", unitPrice: 250000 },
+    { sku: "SPR-001", name: "Sprei & Bantal", category: "Perlengkapan Kamar", locationType: "ROOM" as const, unit: "set", unitPrice: 150000 },
+    { sku: "KMP-001", name: "Kompor Gas", category: "Dapur Bersama", locationType: "SHARED" as const, unit: "unit", unitPrice: 400000 },
+    { sku: "KAS-001", name: "Peralatan Dapur (Set)", category: "Dapur Bersama", locationType: "SHARED" as const, unit: "set", unitPrice: 300000 },
+    { sku: "KUL-001", name: "Kulkas Bersama", category: "Dapur Bersama", locationType: "SHARED" as const, unit: "unit", unitPrice: 2500000 },
+    { sku: "MSC-001", name: "Mesin Cuci", category: "Laundry", locationType: "SHARED" as const, unit: "unit", unitPrice: 3000000 },
+    { sku: "JMR-001", name: "Jemuran", category: "Laundry", locationType: "SHARED" as const, unit: "unit", unitPrice: 500000 },
+    { sku: "CCTV-001", name: "Kamera CCTV", category: "Fasilitas Umum", locationType: "BUILDING" as const, unit: "unit", unitPrice: 800000 },
+    { sku: "PMP-001", name: "Pompa Air", category: "Fasilitas Umum", locationType: "BUILDING" as const, unit: "unit", unitPrice: 1200000 },
+  ];
+
+  const itemMap: Record<string, number> = {};
+  for (const item of invItems) {
+    const existing = await prisma.inventoryItem.findFirst({ where: { sku: item.sku } });
+    const row = existing || await prisma.inventoryItem.create({
+      data: {
+        sku: item.sku,
+        name: item.name,
+        categoryId: categoryMap[item.category],
+        locationType: item.locationType,
+        unit: item.unit,
+        unitPrice: item.unitPrice,
+      },
+    });
+    itemMap[item.sku] = row.id;
+  }
+
+  const sharedAreas = [
+    { name: "Dapur Bersama", description: "Dapur shared untuk seluruh penghuni" },
+    { name: "Ruang Laundry", description: "Area cuci dan jemur" },
+    { name: "Ruang Tamu", description: "Ruang tamu/lobby kosan" },
+    { name: "Parkir Motor", description: "Area parkir kendaraan penghuni" },
+  ];
+
+  for (const area of sharedAreas) {
+    const existing = await prisma.sharedArea.findFirst({ where: { name: area.name } });
+    if (!existing) await prisma.sharedArea.create({ data: area });
+  }
+
+  const stdTemplate = await prisma.roomTemplate.findFirst({ where: { name: "Kamar Standard" } })
+    || await prisma.roomTemplate.create({
+      data: {
+        name: "Kamar Standard",
+        description: "Barang wajib untuk kamar tipe standard",
+        items: {
+          create: [
+            { itemId: itemMap["KSR-001"], quantity: 1, required: true },
+            { itemId: itemMap["ALM-001"], quantity: 1, required: true },
+            { itemId: itemMap["MEJ-001"], quantity: 1, required: true },
+            { itemId: itemMap["KRS-001"], quantity: 1, required: true },
+            { itemId: itemMap["LMP-001"], quantity: 1, required: true },
+            { itemId: itemMap["SPR-001"], quantity: 1, required: false },
+          ],
+        },
+      },
+    });
+
+  const deluxeTemplate = await prisma.roomTemplate.findFirst({ where: { name: "Kamar Deluxe (AC)" } })
+    || await prisma.roomTemplate.create({
+      data: {
+        name: "Kamar Deluxe (AC)",
+        description: "Kamar dengan AC dan perlengkapan lengkap",
+        items: {
+          create: [
+            { itemId: itemMap["KSR-001"], quantity: 1, required: true },
+            { itemId: itemMap["ALM-001"], quantity: 1, required: true },
+            { itemId: itemMap["MEJ-001"], quantity: 1, required: true },
+            { itemId: itemMap["KRS-001"], quantity: 1, required: true },
+            { itemId: itemMap["LMP-001"], quantity: 1, required: true },
+            { itemId: itemMap["AC-001"], quantity: 1, required: true },
+            { itemId: itemMap["SPR-001"], quantity: 1, required: true },
+          ],
+        },
+      },
+    });
+
+  await prisma.room.updateMany({
+    where: { roomNumber: { in: ["01", "02", "03", "B01"] } },
+    data: { templateId: stdTemplate.id },
+  });
+  await prisma.room.updateMany({
+    where: { roomNumber: { in: ["123", "A1"] } },
+    data: { templateId: deluxeTemplate.id },
+  });
+
   console.log("Seed completed!");
   console.log("Admin: admin@kosanku.com / admin123");
 }

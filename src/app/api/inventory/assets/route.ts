@@ -1,23 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
-import { deployAssetToRoom } from "@/lib/inventory-service";
+import { deployAssetToRoom, deployAssetToSharedArea } from "@/lib/inventory-service";
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status");
     const roomId = searchParams.get("roomId");
+    const sharedAreaId = searchParams.get("sharedAreaId");
+    const locationType = searchParams.get("locationType");
 
     const where: Record<string, unknown> = {};
     if (status) where.status = status;
     if (roomId) where.roomId = parseInt(roomId);
+    if (sharedAreaId) where.sharedAreaId = parseInt(sharedAreaId);
+    if (locationType) where.item = { locationType };
 
     const assets = await prisma.roomAsset.findMany({
       where,
       include: {
         item: { include: { category: true } },
         room: true,
+        sharedArea: true,
         tenant: { include: { user: true } },
         utility: true,
       },
@@ -35,7 +40,7 @@ export async function PUT(request: NextRequest) {
     const session = await getSession();
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { id, action, roomId, utilityId } = await request.json();
+    const { id, action, roomId, sharedAreaId, utilityId } = await request.json();
     if (!id || !action) return NextResponse.json({ error: "Data wajib belum lengkap" }, { status: 400 });
 
     if (action === "deploy") {
@@ -44,6 +49,16 @@ export async function PUT(request: NextRequest) {
         parseInt(id),
         parseInt(roomId),
         utilityId ? parseInt(utilityId) : undefined,
+        session.userId
+      );
+      return NextResponse.json(asset);
+    }
+
+    if (action === "deploy_shared") {
+      if (!sharedAreaId) return NextResponse.json({ error: "Area bersama wajib dipilih" }, { status: 400 });
+      const asset = await deployAssetToSharedArea(
+        parseInt(id),
+        parseInt(sharedAreaId),
         session.userId
       );
       return NextResponse.json(asset);
