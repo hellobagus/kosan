@@ -146,7 +146,7 @@ export default function InventoryItemList() {
           ) : (
             <Table>
               <thead><tr>
-                <Th>SKU</Th><Th>Nama</Th><Th>Kategori</Th><Th>Satuan</Th><Th>Harga</Th><Th>Stok Gudang</Th><Th>Total Asset</Th><Th>Status</Th><Th></Th>
+                <Th>SKU</Th><Th>Nama</Th><Th>Kategori</Th><Th>Satuan</Th><Th>Harga</Th><Th>Stok Gudang</Th><Th>Total Asset</Th><Th>Status</Th><Th>Aksi</Th>
               </tr></thead>
               <tbody>
                 {items.map((item) => (
