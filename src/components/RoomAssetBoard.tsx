@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useProjectRefreshKey } from "@/hooks/useProjectRefresh";
 import { RotateCcw, Wrench } from "lucide-react";
 import {
   PageHeader, Card, CardBody, Table, Th, Td, Badge, EmptyState, Select, Button, Input, Textarea,
@@ -31,6 +32,7 @@ const STATUS_VARIANT: Record<string, "default" | "success" | "warning" | "danger
 };
 
 export default function RoomAssetBoard() {
+  const refreshKey = useProjectRefreshKey();
   const [assets, setAssets] = useState<Asset[]>([]);
   const [rooms, setRooms] = useState<Array<{ id: number; roomNumber: string }>>([]);
   const [loading, setLoading] = useState(true);
@@ -52,7 +54,7 @@ export default function RoomAssetBoard() {
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { fetchData(); }, [filterRoom, filterStatus]);
+  useEffect(() => { fetchData(); }, [filterRoom, filterStatus, refreshKey]);
 
   useEffect(() => {
     if (!filterRoom) { setCompliance(null); return; }

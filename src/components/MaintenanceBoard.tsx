@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useProjectRefreshKey } from "@/hooks/useProjectRefresh";
 import { CheckCircle, Play } from "lucide-react";
 import {
   PageHeader, Card, CardBody, Table, Th, Td, Badge, EmptyState, Button, Input,
@@ -21,6 +22,7 @@ const STATUS_VARIANT: Record<string, "default" | "success" | "warning" | "danger
 };
 
 export default function MaintenanceBoard() {
+  const refreshKey = useProjectRefreshKey();
   const [maintenances, setMaintenances] = useState<Maintenance[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("OPEN");
@@ -36,7 +38,7 @@ export default function MaintenanceBoard() {
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { fetchData(); }, [filter]);
+  useEffect(() => { fetchData(); }, [filter, refreshKey]);
 
   const handleAction = async (id: number, action: string, extra?: Record<string, unknown>) => {
     await fetch("/api/inventory/maintenance", {

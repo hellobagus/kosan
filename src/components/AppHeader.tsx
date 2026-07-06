@@ -74,9 +74,11 @@ export default function AppHeader({ userRole }: { userRole: string }) {
         body: JSON.stringify({ entityId, projectId }),
       });
       const data = await res.json();
-      if (res.ok) {
+        if (res.ok) {
         setContext(data.context);
         window.dispatchEvent(new CustomEvent("kosanku:context-changed", { detail: data.context }));
+      } else {
+        alert(data.error || "Gagal mengubah project");
       }
     } finally {
       setSaving(false);

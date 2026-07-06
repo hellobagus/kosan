@@ -10,6 +10,7 @@
     "lint": "next lint",
     "db:push": "prisma db push",
     "db:seed": "tsx --env-file=.env prisma/seed.ts",
+    "db:seed:dummy": "tsx --env-file=.env prisma/seed-dummy-project.ts",
     "db:setup": "prisma db push && yarn db:seed",
     "db:check": "tsx --env-file=.env scripts/check-db.ts",
     "db:studio": "prisma studio",

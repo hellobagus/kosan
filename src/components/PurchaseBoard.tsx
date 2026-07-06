@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useProjectRefreshKey } from "@/hooks/useProjectRefresh";
 import { Plus, CheckCircle, XCircle } from "lucide-react";
 import {
   PageHeader, Card, CardBody, Table, Th, Td, Badge, EmptyState,
@@ -25,6 +26,7 @@ const STATUS_BADGE: Record<string, "default" | "success" | "warning" | "danger" 
 };
 
 export default function PurchaseBoard() {
+  const refreshKey = useProjectRefreshKey();
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [items, setItems] = useState<Item[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -47,7 +49,7 @@ export default function PurchaseBoard() {
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => { fetchData(); }, [refreshKey]);
 
   const addLine = () => setLines([...lines, { itemId: "", quantity: "1", unitPrice: "" }]);
   const updateLine = (idx: number, field: keyof LineItem, value: string) => {

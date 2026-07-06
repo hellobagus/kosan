@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useProjectRefreshKey } from "@/hooks/useProjectRefresh";
 import {
   PageHeader, Card, CardBody, Table, Th, Td, Badge, EmptyState,
   Input, Select, Button,
@@ -65,12 +66,14 @@ export default function FinancePage({ type }: { type: "INCOME" | "EXPENSE" }) {
       .finally(() => setLoading(false));
   };
 
+  const refreshKey = useProjectRefreshKey();
+
   useEffect(() => {
     fetchData();
     if (isIncome) {
       fetch("/api/tenants?status=ACTIVE").then((r) => r.json()).then(setTenants);
     }
-  }, [filterMonth, filterYear, startDate, endDate, useDateRange, type]);
+  }, [filterMonth, filterYear, startDate, endDate, useDateRange, type, refreshKey]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

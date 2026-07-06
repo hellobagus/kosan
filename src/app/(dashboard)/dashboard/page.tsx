@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useProjectRefreshKey } from "@/hooks/useProjectRefresh";
 import {
   DoorOpen,
   Users,
@@ -53,13 +54,15 @@ interface DashboardData {
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const refreshKey = useProjectRefreshKey();
 
   useEffect(() => {
+    setLoading(true);
     fetch("/api/dashboard")
       .then((res) => res.json())
       .then(setData)
       .finally(() => setLoading(false));
-  }, []);
+  }, [refreshKey]);
 
   if (loading) {
     return (

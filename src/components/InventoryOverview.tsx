@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useProjectRefreshKey } from "@/hooks/useProjectRefresh";
 import {
   Package, Warehouse, DoorOpen, Users, Wrench, ClipboardCheck,
   ArrowRight, ShoppingCart, AlertTriangle,
@@ -31,15 +32,17 @@ const FLOW_STEPS = [
 ];
 
 export default function InventoryOverview() {
+  const refreshKey = useProjectRefreshKey();
   const [stats, setStats] = useState<InventoryStats | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    setLoading(true);
     fetch("/api/inventory/stats")
       .then((r) => r.json())
       .then(setStats)
       .finally(() => setLoading(false));
-  }, []);
+  }, [refreshKey]);
 
   if (loading) {
     return (

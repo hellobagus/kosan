@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useProjectRefreshKey } from "@/hooks/useProjectRefresh";
 import {
   Calculator, CheckCircle2, ChevronRight, FileText, RefreshCw, Zap,
 } from "lucide-react";
@@ -86,6 +87,7 @@ const STEPS = [
 ];
 
 export default function UtilityBillingBoard() {
+  const refreshKey = useProjectRefreshKey();
   const now = new Date();
   const [invoiceMonth, setInvoiceMonth] = useState(String(now.getMonth() + 1));
   const [invoiceYear, setInvoiceYear] = useState(String(now.getFullYear()));
@@ -114,7 +116,7 @@ export default function UtilityBillingBoard() {
       .finally(() => setLoading(false));
   }, [invoiceMonth, invoiceYear]);
 
-  useEffect(() => { fetchWizard(); }, [fetchWizard]);
+  useEffect(() => { fetchWizard(); }, [fetchWizard, refreshKey]);
 
   const meterKey = (roomId: number, utilityId: number) => `${roomId}-${utilityId}`;
 

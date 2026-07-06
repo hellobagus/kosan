@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useProjectRefreshKey } from "@/hooks/useProjectRefresh";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import {
   PageHeader, Card, CardBody, Table, Th, Td, Badge, EmptyState,
@@ -36,6 +37,7 @@ const EMPTY = {
 };
 
 export default function InventoryItemList() {
+  const refreshKey = useProjectRefreshKey();
   const [items, setItems] = useState<Item[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -60,7 +62,7 @@ export default function InventoryItemList() {
     }).finally(() => setLoading(false));
   };
 
-  useEffect(() => { fetchData(); }, [filterLocation]);
+  useEffect(() => { fetchData(); }, [filterLocation, refreshKey]);
 
   const filteredCategories = useMemo(
     () => (form.locationType ? categories.filter((c) => c.locationType === form.locationType) : categories),

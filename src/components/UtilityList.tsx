@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useProjectRefreshKey } from "@/hooks/useProjectRefresh";
 import { Plus, Pencil, Trash2, Zap } from "lucide-react";
 import {
   PageHeader, Card, CardBody, Table, Th, Td, Badge, EmptyState,
@@ -50,7 +51,9 @@ export default function UtilityList() {
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { fetchData(); }, []);
+  const refreshKey = useProjectRefreshKey();
+
+  useEffect(() => { fetchData(); }, [refreshKey]);
 
   const openCreate = () => {
     setEditing(null);

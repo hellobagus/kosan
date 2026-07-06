@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useProjectRefreshKey } from "@/hooks/useProjectRefresh";
 import { Plus, Trash2, Link2 } from "lucide-react";
 import {
   PageHeader, Card, CardBody, Table, Th, Td, Badge, EmptyState,
@@ -37,6 +38,7 @@ interface RoomUtility {
 }
 
 export default function RoomUtilityBoard() {
+  const refreshKey = useProjectRefreshKey();
   const [roomUtilities, setRoomUtilities] = useState<RoomUtility[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [utilities, setUtilities] = useState<Utility[]>([]);
@@ -59,7 +61,7 @@ export default function RoomUtilityBoard() {
     }).finally(() => setLoading(false));
   };
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => { fetchData(); }, [refreshKey]);
 
   const selectedUtility = utilities.find((u) => u.id === parseInt(form.utilityId));
 

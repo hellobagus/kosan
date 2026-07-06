@@ -1,6 +1,6 @@
 import { TenantStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { getKosanProfile } from "@/lib/settings-service";
+import { getProjectProfileForRoom } from "@/lib/settings-service";
 import { buildContractHtml, toContractTenant } from "@/lib/contract-service";
 import { kosanProfileToContractProfile } from "@/lib/contract-profile";
 import { htmlToPdfBuffer } from "@/lib/contract-pdf";
@@ -68,7 +68,7 @@ export async function sendContractEmail(tenantId: number) {
     return { ok: false as const, error: "Email penghuni belum diisi" };
   }
 
-  const profile = await getKosanProfile();
+  const profile = await getProjectProfileForRoom(tenant.roomId);
   const html = buildContractHtml(
     kosanProfileToContractProfile(profile),
     toContractTenant(tenant)

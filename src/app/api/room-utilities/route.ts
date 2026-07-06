@@ -1,13 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
+import { requireProjectContext, roomProjectFilter } from "@/lib/project-context";
 
 export async function GET(request: NextRequest) {
   try {
+    const auth = await requireProjectContext();
+    if ("error" in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
+
     const { searchParams } = new URL(request.url);
     const roomId = searchParams.get("roomId");
 
-    const where = roomId ? { roomId: parseInt(roomId) } : {};
+    const where: Record<string, unknown> = {
+      room: roomProjectFilter(auth.context.projectId),
+    };
+    if (roomId) where.roomId = parseInt(roomId);
 
     const roomUtilities = await prisma.roomUtility.findMany({
       where,

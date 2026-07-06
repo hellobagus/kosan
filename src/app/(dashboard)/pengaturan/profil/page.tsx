@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useProjectRefreshKey } from "@/hooks/useProjectRefresh";
 import { PageHeader, Card, CardBody, Button, Input, Textarea } from "@/components/ui";
 import { Save } from "lucide-react";
 
@@ -27,8 +28,10 @@ export default function PengaturanProfilPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+  const refreshKey = useProjectRefreshKey();
 
   useEffect(() => {
+    setLoading(true);
     fetch("/api/settings")
       .then((r) => r.json())
       .then((data) => {
@@ -46,7 +49,7 @@ export default function PengaturanProfilPage() {
         }
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [refreshKey]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -73,7 +76,7 @@ export default function PengaturanProfilPage() {
     <div className="p-4 md:p-6 max-w-3xl">
       <PageHeader
         title="Profil Kosan"
-        description="Informasi dasar kosan yang ditampilkan di invoice dan halaman publik."
+        description="Informasi kos untuk project yang aktif di header (Entity → Project). Untuk mengelola daftar entity/project, buka Pengaturan → Entity & Project."
       />
 
       {message && (

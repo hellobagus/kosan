@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useProjectRefreshKey } from "@/hooks/useProjectRefresh";
 import Link from "next/link";
 import {
   User, Calendar, Plus, Search, X, FileText, MessageCircle, Printer,
@@ -128,7 +129,8 @@ export default function TenantBoard({ defaultTab = "ACTIVE" }: { defaultTab?: Ta
       .finally(() => setLoading(false));
   }, [tab]);
 
-  useEffect(() => { fetchTenants(); }, [fetchTenants]);
+  const refreshKey = useProjectRefreshKey();
+  useEffect(() => { fetchTenants(); }, [fetchTenants, refreshKey]);
   useEffect(() => { setPage(1); }, [tab, search]);
 
   const filtered = useMemo(() => {

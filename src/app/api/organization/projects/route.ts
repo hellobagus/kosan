@@ -12,7 +12,29 @@ export async function GET(request: NextRequest) {
 
   await ensureDefaultOrganization();
 
-  const entityId = request.nextUrl.searchParams.get("entityId");
+  const { searchParams } = request.nextUrl;
+  const entityId = searchParams.get("entityId");
+  const projectId = searchParams.get("id");
+
+  if (projectId) {
+    const id = parseInt(projectId, 10);
+    const project = await prisma.project.findUnique({
+      where: { id },
+      include: {
+        entity: { select: { id: true, code: true, name: true } },
+        buildings: {
+          include: { _count: { select: { floors: true } } },
+        },
+      },
+    });
+    if (!project) return NextResponse.json({ error: "Project tidak ditemukan" }, { status: 404 });
+
+    const allowed = await userCanAccessEntity(session.userId, session.role, project.entityId);
+    if (!allowed) return NextResponse.json({ error: "Akses ditolak" }, { status: 403 });
+
+    return NextResponse.json(project);
+  }
+
   const projects = await getAccessibleProjects(
     session.userId,
     session.role,

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useProjectRefreshKey } from "@/hooks/useProjectRefresh";
 import { useSearchParams } from "next/navigation";
 import { ArrowRightLeft, Check, FileText, Printer, RefreshCw, Trash2, X } from "lucide-react";
 import { Button, Card, CardBody, EmptyState, Input, PageHeader, Select } from "@/components/ui";
@@ -159,9 +160,10 @@ export default function RoomTransferBoard() {
     }
   }, [selectedId]);
 
+  const refreshKey = useProjectRefreshKey();
   useEffect(() => {
     fetchAll();
-  }, [fetchAll]);
+  }, [fetchAll, refreshKey]);
 
   useEffect(() => {
     if (preselectedTenantId && tenants.some((t) => String(t.id) === preselectedTenantId)) {

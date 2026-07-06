@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useProjectRefreshKey } from "@/hooks/useProjectRefresh";
 import { Printer, Download } from "lucide-react";
 import { PageHeader, Card, CardBody, Table, Th, Td, Select, Button } from "@/components/ui";
 import { formatCurrency, formatShortDate, getMonthName } from "@/lib/utils";
@@ -87,7 +88,9 @@ export default function LaporanPage() {
     }
   };
 
-  useEffect(() => { generateReport(); }, []);
+  const refreshKey = useProjectRefreshKey();
+
+  useEffect(() => { generateReport(); }, [refreshKey]);
 
   const handlePrint = () => window.print();
 

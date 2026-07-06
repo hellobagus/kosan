@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useProjectRefreshKey } from "@/hooks/useProjectRefresh";
 import Link from "next/link";
 import {
   BedDouble,
@@ -46,6 +47,7 @@ function formatPriceShort(amount: string | number | null): string {
 }
 
 export default function RoomBoard() {
+  const refreshKey = useProjectRefreshKey();
   const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -83,18 +85,12 @@ export default function RoomBoard() {
   }, []);
 
   useEffect(() => {
-    const onContext = () => fetchRooms();
-    window.addEventListener("kosanku:context-changed", onContext);
-    return () => window.removeEventListener("kosanku:context-changed", onContext);
-  }, [fetchRooms]);
-
-  useEffect(() => {
     fetchRooms();
     fetch("/api/inventory/items?locationType=ROOM")
       .then((r) => r.json())
       .then(setInventoryItems)
       .catch(() => {});
-  }, [fetchRooms]);
+  }, [fetchRooms, refreshKey]);
 
   const floors = useMemo(
     () => [...new Set(rooms.map((r) => r.floor))].sort((a, b) => a - b),

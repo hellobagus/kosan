@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { getProjectContextForUser } from "@/lib/project-context";
 import { getSession, isStaff } from "@/lib/auth";
 import { ensureDefaultOrganization } from "@/lib/organization-service";
+import { resolveProjectFromRoom } from "@/lib/document-number";
 
 export type ProjectProfile = {
   id: number;
@@ -43,6 +44,16 @@ export async function getProjectProfile(projectId?: number): Promise<ProjectProf
     if (project) return project;
   }
 
+  await ensureDefaultOrganization();
+  return prisma.project.findFirstOrThrow({ orderBy: { id: "asc" } });
+}
+
+/** Profil project dari kamar penghuni (untuk kontrak, invoice, BA, dll.) */
+export async function getProjectProfileForRoom(roomId: number): Promise<ProjectProfile> {
+  const org = await resolveProjectFromRoom(roomId);
+  if (org) {
+    return getProjectProfile(org.projectId);
+  }
   await ensureDefaultOrganization();
   return prisma.project.findFirstOrThrow({ orderBy: { id: "asc" } });
 }

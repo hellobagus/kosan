@@ -4,13 +4,42 @@ import { prisma } from "@/lib/prisma";
 import { ensureDefaultOrganization } from "@/lib/organization-service";
 import { userCanAccessEntity } from "@/lib/access-control";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const session = await getSession();
   if (!session || !isStaff(session.role)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   await ensureDefaultOrganization();
+
+  const entityIdParam = request.nextUrl.searchParams.get("entityId");
+  const detailId = entityIdParam ? parseInt(entityIdParam, 10) : NaN;
+
+  if (detailId) {
+    const allowed = await userCanAccessEntity(session.userId, session.role, detailId);
+    if (!allowed) return NextResponse.json({ error: "Akses ditolak" }, { status: 403 });
+
+    const entity = await prisma.entity.findUnique({
+      where: { id: detailId },
+      include: {
+        holding: { select: { id: true, code: true, name: true } },
+        projects: {
+          where: { active: true },
+          orderBy: { code: "asc" },
+          include: {
+            _count: {
+              select: {
+                buildings: true,
+              },
+            },
+          },
+        },
+        bankAccounts: { orderBy: { sortOrder: "asc" } },
+      },
+    });
+    if (!entity) return NextResponse.json({ error: "Entity tidak ditemukan" }, { status: 404 });
+    return NextResponse.json(entity);
+  }
 
   const holdings = await prisma.holding.findMany({
     where: { active: true },

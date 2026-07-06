@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useProjectRefreshKey } from "@/hooks/useProjectRefresh";
 import { Plus, Pencil, Trash2, CheckCircle2, AlertCircle } from "lucide-react";
 import {
   PageHeader, Card, CardBody, Table, Th, Td, Badge, EmptyState,
@@ -19,6 +20,7 @@ interface Template {
 interface Room { id: number; roomNumber: string; template?: { id: number; name: string } | null; }
 
 export default function RoomTemplateBoard() {
+  const refreshKey = useProjectRefreshKey();
   const [templates, setTemplates] = useState<Template[]>([]);
   const [roomItems, setRoomItems] = useState<Item[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -44,7 +46,7 @@ export default function RoomTemplateBoard() {
     }).finally(() => setLoading(false));
   };
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => { fetchData(); }, [refreshKey]);
 
   const openCreate = () => {
     setEditing(null);

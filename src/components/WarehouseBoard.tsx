@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useProjectRefreshKey } from "@/hooks/useProjectRefresh";
 import {
   PageHeader, Card, CardHeader, CardBody, Table, Th, Td, Badge, EmptyState, Button, Select,
 } from "@/components/ui";
@@ -24,6 +25,7 @@ interface Room { id: number; roomNumber: string; }
 interface SharedArea { id: number; name: string; }
 
 export default function WarehouseBoard() {
+  const refreshKey = useProjectRefreshKey();
   const [stocks, setStocks] = useState<Stock[]>([]);
   const [warehouseAssets, setWarehouseAssets] = useState<Asset[]>([]);
   const [entries, setEntries] = useState<Entry[]>([]);
@@ -48,7 +50,7 @@ export default function WarehouseBoard() {
     }).finally(() => setLoading(false));
   };
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => { fetchData(); }, [refreshKey]);
 
   const handleDeploy = async (asset: Asset) => {
     if (!deployTarget) return;

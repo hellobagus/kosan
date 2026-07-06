@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useProjectRefreshKey } from "@/hooks/useProjectRefresh";
 import { Building, Layers, Plus } from "lucide-react";
 import { Button, Card, CardBody, Input, PageHeader, Select } from "@/components/ui";
 
@@ -31,9 +32,11 @@ export default function OrganizationBoard() {
       .finally(() => setLoading(false));
   }, []);
 
+  const refreshKey = useProjectRefreshKey();
+
   useEffect(() => {
     fetchData();
-  }, [fetchData]);
+  }, [fetchData, refreshKey]);
 
   const addBuilding = async () => {
     if (!buildingForm.name || !buildingForm.code) return;

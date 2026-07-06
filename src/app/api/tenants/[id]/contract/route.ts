@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession, isStaff } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getKosanProfile } from "@/lib/settings-service";
+import { getProjectProfileForRoom } from "@/lib/settings-service";
 import { buildContractHtml, toContractTenant } from "@/lib/contract-service";
 import { kosanProfileToContractProfile } from "@/lib/contract-profile";
 
@@ -24,7 +24,7 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const profile = await getKosanProfile();
+    const profile = await getProjectProfileForRoom(tenant.roomId);
     const html = buildContractHtml(
       kosanProfileToContractProfile(profile),
       toContractTenant(tenant)

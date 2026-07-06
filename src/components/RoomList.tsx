@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useProjectRefreshKey } from "@/hooks/useProjectRefresh";
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import {
@@ -35,6 +36,7 @@ export default function RoomListPage({
   filter?: string;
   showAdd?: boolean;
 }) {
+  const refreshKey = useProjectRefreshKey();
   const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -44,7 +46,7 @@ export default function RoomListPage({
       .then((res) => res.json())
       .then(setRooms)
       .finally(() => setLoading(false));
-  }, [filter]);
+  }, [filter, refreshKey]);
 
   if (loading) {
     return (

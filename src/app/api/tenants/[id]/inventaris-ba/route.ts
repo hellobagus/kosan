@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession, isStaff } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getKosanProfile } from "@/lib/settings-service";
+import { getProjectProfileForRoom } from "@/lib/settings-service";
 import { buildInventoryBaHtml, getRoomInventoryItems, toContractTenant } from "@/lib/contract-service";
 import { kosanProfileToContractProfile } from "@/lib/contract-profile";
 
@@ -27,7 +27,7 @@ export async function GET(
     }
 
     const [profile, items] = await Promise.all([
-      getKosanProfile(),
+      getProjectProfileForRoom(tenant.roomId),
       getRoomInventoryItems(tenant.roomId),
     ]);
 

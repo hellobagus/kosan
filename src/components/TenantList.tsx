@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useProjectRefreshKey } from "@/hooks/useProjectRefresh";
 import Link from "next/link";
 import { Plus, UserCheck } from "lucide-react";
 import {
@@ -39,6 +40,8 @@ export default function TenantListPage({
   const [refundId, setRefundId] = useState<number | null>(null);
   const [refundAmount, setRefundAmount] = useState("");
 
+  const refreshKey = useProjectRefreshKey();
+
   const fetchTenants = () => {
     fetch(`/api/tenants?status=${status}`)
       .then((res) => res.json())
@@ -46,7 +49,7 @@ export default function TenantListPage({
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { fetchTenants(); }, [status]);
+  useEffect(() => { fetchTenants(); }, [status, refreshKey]);
 
   const handleRefundDeposit = async () => {
     if (!refundId) return;
