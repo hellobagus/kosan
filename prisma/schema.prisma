@@ -130,6 +130,8 @@ model KosanProfile {
   leasePackages           Json?    @map("lease_packages")
   managerName             String?  @map("manager_name") @db.VarChar(100)
   contractLocation        String?  @map("contract_location") @db.VarChar(100)
+  contractTemplate        String?  @map("contract_template") @db.Text
+  inventoryBaTemplate     String?  @map("inventory_ba_template") @db.Text
   updatedAt               DateTime @updatedAt @map("updated_at")
 
   @@map("kosan_profile")

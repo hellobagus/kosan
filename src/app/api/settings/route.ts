@@ -93,5 +93,20 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ profile, banks });
   }
 
+  if (section === "contract_template") {
+    const profile = await prisma.kosanProfile.upsert({
+      where: { id: 1 },
+      update: {
+        contractTemplate: body.contractTemplate ?? null,
+        inventoryBaTemplate: body.inventoryBaTemplate ?? null,
+      },
+      create: {
+        contractTemplate: body.contractTemplate ?? null,
+        inventoryBaTemplate: body.inventoryBaTemplate ?? null,
+      },
+    });
+    return NextResponse.json(profile);
+  }
+
   return NextResponse.json({ error: "Section tidak valid" }, { status: 400 });
 }

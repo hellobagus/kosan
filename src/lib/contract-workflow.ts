@@ -2,6 +2,7 @@ import { TenantStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getKosanProfile } from "@/lib/settings-service";
 import { buildContractHtml, toContractTenant } from "@/lib/contract-service";
+import { kosanProfileToContractProfile } from "@/lib/contract-profile";
 import { sendEmail, isEmailConfigured } from "@/lib/email-service";
 import { activateRoomAssetsForTenant } from "@/lib/inventory-service";
 
@@ -68,15 +69,7 @@ export async function sendContractEmail(tenantId: number) {
 
   const profile = await getKosanProfile();
   const html = buildContractHtml(
-    {
-      name: profile.name,
-      address: profile.address,
-      phone: profile.phone,
-      email: profile.email,
-      managerName: profile.managerName,
-      contractLocation: profile.contractLocation,
-      latePenaltyPerDay: Number(profile.latePenaltyPerDay),
-    },
+    kosanProfileToContractProfile(profile),
     toContractTenant(tenant)
   );
 

@@ -83,6 +83,7 @@ const navigation = [
     icon: Settings,
     children: [
       { name: "Profil Kosan", href: "/pengaturan/profil" },
+      { name: "Template Kontrak", href: "/pengaturan/template-kontrak" },
       { name: "Pengaturan Kosan", href: "/pengaturan/kosan" },
     ],
   },
