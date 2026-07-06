@@ -188,6 +188,10 @@ function TambahPenghuniForm() {
     npwp: "",
     maritalStatus: "",
     occupation: "",
+    ktpAddress: "",
+    correspondenceAddress: "",
+    workplace: "",
+    workplaceAddress: "",
     roomId: preselectedRoomId,
     checkIn: "",
     monthlyRent: "",
@@ -436,6 +440,7 @@ function TambahPenghuniForm() {
           additionalOccupants: additionalOccupants.slice(0, Math.max(0, occupantCount - 1)),
           agreedTerms: true,
           contractRequested: true,
+          status: "PENDING",
         }),
       });
       const data = await res.json();
@@ -443,7 +448,7 @@ function TambahPenghuniForm() {
         setError(data.error);
         return;
       }
-      router.push(form.status === "RESERVED" ? "/penghuni/reservasi" : "/penghuni/aktif");
+      router.push("/penghuni/calon");
       router.refresh();
     } catch {
       setError("Terjadi kesalahan");
@@ -676,6 +681,28 @@ function TambahPenghuniForm() {
               />
             </FormRow>
 
+            <FormRow label="Alamat KTP" required>
+              <textarea
+                className={`${inputClass} resize-none`}
+                rows={3}
+                placeholder="Alamat sesuai KTP"
+                value={form.ktpAddress}
+                onChange={(e) => setForm({ ...form, ktpAddress: e.target.value })}
+                required
+              />
+            </FormRow>
+
+            <FormRow label="Alamat Korespondensi" required>
+              <textarea
+                className={`${inputClass} resize-none`}
+                rows={3}
+                placeholder="Alamat surat menyurat / korespondensi"
+                value={form.correspondenceAddress}
+                onChange={(e) => setForm({ ...form, correspondenceAddress: e.target.value })}
+                required
+              />
+            </FormRow>
+
             <FormRow
               label="Foto KTP"
               required
@@ -729,6 +756,27 @@ function TambahPenghuniForm() {
                 placeholder="Pekerjaan Penghuni"
                 value={form.occupation}
                 onChange={(e) => setForm({ ...form, occupation: e.target.value })}
+                required
+              />
+            </FormRow>
+
+            <FormRow label="Tempat Kerja/Kampus/Lainnya" required>
+              <input
+                className={inputClass}
+                placeholder="Nama tempat kerja, kampus, atau lainnya"
+                value={form.workplace}
+                onChange={(e) => setForm({ ...form, workplace: e.target.value })}
+                required
+              />
+            </FormRow>
+
+            <FormRow label="Alamat Tempat Kerja/Kampus/Lainnya" required>
+              <textarea
+                className={`${inputClass} resize-none`}
+                rows={3}
+                placeholder="Alamat tempat kerja, kampus, atau lainnya"
+                value={form.workplaceAddress}
+                onChange={(e) => setForm({ ...form, workplaceAddress: e.target.value })}
                 required
               />
             </FormRow>
@@ -906,8 +954,9 @@ function TambahPenghuniForm() {
                 Kontrak Sewa
               </div>
               <div className="px-4 py-3 text-sm text-slate-600">
-                Kontrak sewa akan dikirim ke email penghuni ({form.email || "belum diisi"}) dalam
-                format PDF setelah data disimpan.
+                Kontrak sewa akan dikirim ke email penghuni ({form.email || "belum diisi"}).
+                Penghuni mencetak, menandatangani secara manual (+ materai Rp10.000), lalu menyerahkan
+                dokumen fisik ke pengelola.
               </div>
               <label className="flex items-center gap-2 px-4 py-3 border-t border-slate-200 text-sm text-slate-700 bg-slate-50">
                 <input

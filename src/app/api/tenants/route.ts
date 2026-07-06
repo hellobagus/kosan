@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
       status, leaseDuration, occupantCount, discount, additionalFees, isDaily,
       gender, ktp, maritalStatus, occupation, paidAmount, paymentStatus,
       emergencyPhone, additionalOccupants, agreedTerms, contractRequested,
-      paymentType,
+      paymentType, ktpAddress, correspondenceAddress, workplace, workplaceAddress,
     } = body;
 
     if (!name || !roomId || !checkIn || !monthlyRent) {
@@ -77,9 +77,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Kamar tidak ditemukan" }, { status: 400 });
     }
 
-    const tenantStatus = status || "ACTIVE";
+    const tenantStatus = status || (contractRequested ? "PENDING" : "ACTIVE");
+    const preActiveStatuses = ["PENDING", "APPROVED", "CONTRACT_SENT", "CONTRACT_SIGNED", "RESERVED"];
     if (tenantStatus === "ACTIVE" && room.status !== "AVAILABLE") {
       return NextResponse.json({ error: "Kamar tidak tersedia" }, { status: 400 });
+    }
+    if (preActiveStatuses.includes(tenantStatus) && tenantStatus !== "RESERVED" && room.status !== "AVAILABLE") {
+      const activeTenant = await prisma.tenant.findFirst({
+        where: { roomId: parseInt(roomId), status: "ACTIVE" },
+      });
+      if (activeTenant) {
+        return NextResponse.json({ error: "Kamar sudah terisi penghuni aktif" }, { status: 400 });
+      }
     }
 
     let userId: number;
@@ -101,6 +110,10 @@ export async function POST(request: NextRequest) {
           ktp: ktp || null,
           maritalStatus: maritalStatus || null,
           occupation: occupation || null,
+          ktpAddress: ktpAddress || null,
+          correspondenceAddress: correspondenceAddress || null,
+          workplace: workplace || null,
+          workplaceAddress: workplaceAddress || null,
         },
       });
     } else {
@@ -117,6 +130,10 @@ export async function POST(request: NextRequest) {
           ktp: ktp || null,
           maritalStatus: maritalStatus || null,
           occupation: occupation || null,
+          ktpAddress: ktpAddress || null,
+          correspondenceAddress: correspondenceAddress || null,
+          workplace: workplace || null,
+          workplaceAddress: workplaceAddress || null,
         },
       });
       userId = newUser.id;
@@ -186,7 +203,7 @@ export async function POST(request: NextRequest) {
           monthlyRent: parseFloat(monthlyRent),
           deposit: deposit ? parseFloat(deposit) : 0,
           notes: notes || null,
-          status: tenantStatus as "ACTIVE" | "RESERVED",
+          status: tenantStatus as TenantStatus,
           leaseDuration: lease,
           occupantCount: occCount,
           discount: discount ? parseFloat(discount) : 0,
@@ -375,7 +392,10 @@ export async function PUT(request: NextRequest) {
     }
 
     if (action === "update_profile") {
-      const { name, phone, gender, ktp, maritalStatus, occupation, address, notes } = body;
+      const {
+        name, phone, gender, ktp, maritalStatus, occupation, address, notes,
+        ktpAddress, correspondenceAddress, workplace, workplaceAddress,
+      } = body;
       await prisma.user.update({
         where: { id: tenant.userId },
         data: {
@@ -386,6 +406,10 @@ export async function PUT(request: NextRequest) {
           maritalStatus: maritalStatus ?? tenant.user.maritalStatus,
           occupation: occupation ?? tenant.user.occupation,
           address: address ?? tenant.user.address,
+          ktpAddress: ktpAddress ?? tenant.user.ktpAddress,
+          correspondenceAddress: correspondenceAddress ?? tenant.user.correspondenceAddress,
+          workplace: workplace ?? tenant.user.workplace,
+          workplaceAddress: workplaceAddress ?? tenant.user.workplaceAddress,
         },
       });
       const updated = await prisma.tenant.update({
@@ -396,25 +420,55 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json(updated);
     }
 
-    if (action === "activate") {
-      if (tenant.status !== "RESERVED") {
-        return NextResponse.json({ error: "Hanya reservasi yang dapat diproses" }, { status: 400 });
-      }
-      const updated = await prisma.$transaction(async (tx) => {
-        const t = await tx.tenant.update({
-          where: { id: parseInt(id) },
-          data: { status: "ACTIVE" },
-          include: { user: true, room: true },
-        });
-        await tx.room.update({
-          where: { id: tenant.roomId },
-          data: { status: "OCCUPIED" },
-        });
-        return t;
-      });
-      const { activateRoomAssetsForTenant } = await import("@/lib/inventory-service");
-      await activateRoomAssetsForTenant(tenant.roomId, parseInt(id), session.userId).catch(() => {});
-      return NextResponse.json(updated);
+    if (action === "activate" || action === "checkin") {
+      const { checkinTenant } = await import("@/lib/contract-workflow");
+      const result = await checkinTenant(parseInt(id), session.userId);
+      if (!result.ok) return NextResponse.json({ error: result.error }, { status: 400 });
+      return NextResponse.json(result.tenant);
+    }
+
+    if (action === "approve") {
+      const { approveTenant } = await import("@/lib/contract-workflow");
+      const result = await approveTenant(parseInt(id), session.userId);
+      if (!result.ok) return NextResponse.json({ error: result.error }, { status: 400 });
+      return NextResponse.json(result.tenant);
+    }
+
+    if (action === "reject") {
+      const { rejectTenant } = await import("@/lib/contract-workflow");
+      const result = await rejectTenant(parseInt(id));
+      if (!result.ok) return NextResponse.json({ error: result.error }, { status: 400 });
+      return NextResponse.json({ success: true });
+    }
+
+    if (action === "send_contract") {
+      const { sendContractEmail } = await import("@/lib/contract-workflow");
+      const result = await sendContractEmail(parseInt(id));
+      if (!result.ok) return NextResponse.json({ error: result.error }, { status: 400 });
+      return NextResponse.json(result);
+    }
+
+    if (action === "mark_signed") {
+      const { markContractSigned } = await import("@/lib/contract-workflow");
+      const { signedUrl } = body;
+      const result = await markContractSigned(parseInt(id), signedUrl);
+      if (!result.ok) return NextResponse.json({ error: result.error }, { status: 400 });
+      return NextResponse.json(result.tenant);
+    }
+
+    if (action === "generate_ba") {
+      const { generateInventoryBa } = await import("@/lib/contract-workflow");
+      const result = await generateInventoryBa(parseInt(id));
+      if (!result.ok) return NextResponse.json({ error: result.error }, { status: 400 });
+      return NextResponse.json(result.tenant);
+    }
+
+    if (action === "refund_deposit") {
+      const { refundDeposit } = await import("@/lib/contract-workflow");
+      const { amount } = body;
+      const result = await refundDeposit(parseInt(id), parseFloat(amount || "0"), session.userId);
+      if (!result.ok) return NextResponse.json({ error: result.error }, { status: 400 });
+      return NextResponse.json(result.tenant);
     }
 
     if (action === "apply_utility_invoice") {

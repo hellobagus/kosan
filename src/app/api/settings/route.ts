@@ -32,6 +32,8 @@ export async function PUT(request: NextRequest) {
         phone: body.phone,
         email: body.email,
         logoUrl: body.logoUrl,
+        managerName: body.managerName,
+        contractLocation: body.contractLocation,
       },
       create: {
         name: body.name || "KosanKu",
@@ -39,6 +41,8 @@ export async function PUT(request: NextRequest) {
         phone: body.phone,
         email: body.email,
         logoUrl: body.logoUrl,
+        managerName: body.managerName,
+        contractLocation: body.contractLocation,
       },
     });
     return NextResponse.json(profile);

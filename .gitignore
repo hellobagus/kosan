@@ -40,3 +40,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# uploaded contract scans
+/public/uploads/contracts/*
+!/public/uploads/contracts/.gitkeep
+
+# suspicious / local artifacts
+*.log
+scanner_linux

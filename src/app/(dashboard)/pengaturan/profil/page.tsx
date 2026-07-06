@@ -10,6 +10,8 @@ interface ProfileForm {
   phone: string;
   email: string;
   logoUrl: string;
+  managerName: string;
+  contractLocation: string;
 }
 
 export default function PengaturanProfilPage() {
@@ -19,6 +21,8 @@ export default function PengaturanProfilPage() {
     phone: "",
     email: "",
     logoUrl: "",
+    managerName: "",
+    contractLocation: "",
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -36,6 +40,8 @@ export default function PengaturanProfilPage() {
             phone: p.phone || "",
             email: p.email || "",
             logoUrl: p.logoUrl || "",
+            managerName: p.managerName || "",
+            contractLocation: p.contractLocation || "",
           });
         }
       })
@@ -115,6 +121,18 @@ export default function PengaturanProfilPage() {
             value={form.logoUrl}
             onChange={(e) => setForm({ ...form, logoUrl: e.target.value })}
             placeholder="https://..."
+          />
+          <Input
+            label="Nama Pengurus (PIHAK PERTAMA)"
+            value={form.managerName}
+            onChange={(e) => setForm({ ...form, managerName: e.target.value })}
+            placeholder="Contoh: Ibu Yuli"
+          />
+          <Input
+            label="Lokasi Penandatanganan Kontrak"
+            value={form.contractLocation}
+            onChange={(e) => setForm({ ...form, contractLocation: e.target.value })}
+            placeholder="Contoh: Tangerang"
           />
         </CardBody>
       </Card>

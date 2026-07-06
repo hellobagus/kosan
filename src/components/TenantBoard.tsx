@@ -46,6 +46,10 @@ export interface TenantData {
     maritalStatus: string | null;
     occupation: string | null;
     address: string | null;
+    ktpAddress: string | null;
+    correspondenceAddress: string | null;
+    workplace: string | null;
+    workplaceAddress: string | null;
   };
   room: {
     id: number;
@@ -110,7 +114,9 @@ export default function TenantBoard({ defaultTab = "ACTIVE" }: { defaultTab?: Ta
     occupantCount: "1", discount: "0", additionalFees: [] as AdditionalFee[],
   });
   const [editForm, setEditForm] = useState({
-    name: "", phone: "", gender: "", ktp: "", maritalStatus: "", occupation: "", address: "", notes: "",
+    name: "", phone: "", gender: "", ktp: "", maritalStatus: "", occupation: "",
+    ktpAddress: "", correspondenceAddress: "", workplace: "", workplaceAddress: "",
+    address: "", notes: "",
   });
 
   const fetchTenants = useCallback(() => {
@@ -195,6 +201,10 @@ export default function TenantBoard({ defaultTab = "ACTIVE" }: { defaultTab?: Ta
         ktp: tenant.user.ktp || "",
         maritalStatus: tenant.user.maritalStatus || "",
         occupation: tenant.user.occupation || "",
+        ktpAddress: tenant.user.ktpAddress || "",
+        correspondenceAddress: tenant.user.correspondenceAddress || "",
+        workplace: tenant.user.workplace || "",
+        workplaceAddress: tenant.user.workplaceAddress || "",
         address: tenant.user.address || "",
         notes: tenant.notes || "",
       });
@@ -769,9 +779,15 @@ export default function TenantBoard({ defaultTab = "ACTIVE" }: { defaultTab?: Ta
             <Input label="Pekerjaan" value={editForm.occupation}
               onChange={(e) => setEditForm({ ...editForm, occupation: e.target.value })} />
           </div>
-          <div className="mt-4">
-            <Input label="Alamat" value={editForm.address}
-              onChange={(e) => setEditForm({ ...editForm, address: e.target.value })} />
+          <div className="mt-4 space-y-4">
+            <Input label="Alamat KTP" value={editForm.ktpAddress}
+              onChange={(e) => setEditForm({ ...editForm, ktpAddress: e.target.value })} />
+            <Input label="Alamat Korespondensi" value={editForm.correspondenceAddress}
+              onChange={(e) => setEditForm({ ...editForm, correspondenceAddress: e.target.value })} />
+            <Input label="Tempat Kerja/Kampus/Lainnya" value={editForm.workplace}
+              onChange={(e) => setEditForm({ ...editForm, workplace: e.target.value })} />
+            <Input label="Alamat Tempat Kerja/Kampus/Lainnya" value={editForm.workplaceAddress}
+              onChange={(e) => setEditForm({ ...editForm, workplaceAddress: e.target.value })} />
           </div>
           <label className="flex items-center gap-2 mt-4 text-sm">
             <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} />

@@ -20,8 +20,13 @@ enum RoomStatus {
 }
 
 enum TenantStatus {
+  PENDING
+  APPROVED
+  CONTRACT_SENT
+  CONTRACT_SIGNED
   ACTIVE
   RESERVED
+  CHECKOUT_PENDING
   COMPLETED
 }
 
@@ -123,6 +128,8 @@ model KosanProfile {
   yearlyLeaseBonusMonths  Int      @default(1) @map("yearly_lease_bonus_months")
   leaseBonusRules         Json?    @map("lease_bonus_rules")
   leasePackages           Json?    @map("lease_packages")
+  managerName             String?  @map("manager_name") @db.VarChar(100)
+  contractLocation        String?  @map("contract_location") @db.VarChar(100)
   updatedAt               DateTime @updatedAt @map("updated_at")
 
   @@map("kosan_profile")
@@ -157,11 +164,15 @@ model User {
   password      String   @db.VarChar(255)
   phone         String?  @db.VarChar(20)
   role          UserRole @default(TENANT)
-  address       String?
-  gender        String?  @db.VarChar(20)
-  ktp           String?  @db.VarChar(20)
-  maritalStatus String?  @map("marital_status") @db.VarChar(30)
-  occupation    String?  @db.VarChar(100)
+  address               String?
+  ktpAddress            String?  @map("ktp_address")
+  correspondenceAddress String?  @map("correspondence_address")
+  workplace             String?  @db.VarChar(150)
+  workplaceAddress      String?  @map("workplace_address")
+  gender                String?  @db.VarChar(20)
+  ktp                   String?  @db.VarChar(20)
+  maritalStatus         String?  @map("marital_status") @db.VarChar(30)
+  occupation            String?  @db.VarChar(100)
   isActive      Boolean  @default(true) @map("is_active")
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
@@ -233,6 +244,14 @@ model Tenant {
   additionalOccupants  Json?         @map("additional_occupants")
   termsAcceptedAt      DateTime?     @map("terms_accepted_at")
   contractRequested    Boolean       @default(false) @map("contract_requested")
+  approvedAt           DateTime?     @map("approved_at")
+  approvedBy           Int?          @map("approved_by")
+  contractSentAt       DateTime?     @map("contract_sent_at")
+  contractSignedAt     DateTime?     @map("contract_signed_at")
+  contractSignedUrl    String?       @map("contract_signed_url")
+  inventoryBaAt        DateTime?     @map("inventory_ba_at")
+  depositRefundAmount  Decimal?      @map("deposit_refund_amount") @db.Decimal(12, 2)
+  depositRefundedAt    DateTime?     @map("deposit_refunded_at")
   checkoutInspectionAt DateTime?     @map("checkout_inspection_at")
   notes                String?
   createdAt            DateTime      @default(now()) @map("created_at")
