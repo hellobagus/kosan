@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getKosanProfile } from "@/lib/settings-service";
 import { buildContractHtml, toContractTenant } from "@/lib/contract-service";
 import { kosanProfileToContractProfile } from "@/lib/contract-profile";
+import { htmlToPdfBuffer } from "@/lib/contract-pdf";
 import { sendEmail, isEmailConfigured } from "@/lib/email-service";
 import { activateRoomAssetsForTenant } from "@/lib/inventory-service";
 
@@ -74,20 +75,28 @@ export async function sendContractEmail(tenantId: number) {
   );
 
   const appUrl = process.env.APP_URL || "http://localhost:3000";
-  const viewUrl = `${appUrl}/api/tenants/${tenantId}/contract`;
+  const viewUrl = `${appUrl}/api/tenants/${tenantId}/contract?format=pdf`;
+  const pdfFilename = `Kontrak_Sewa_${tenant.user.name.replace(/\s+/g, "_")}.pdf`;
+
+  let pdfBuffer: Buffer;
+  try {
+    pdfBuffer = await htmlToPdfBuffer(html);
+  } catch (err) {
+    console.error("PDF generation error:", err);
+    return { ok: false as const, error: "Gagal membuat PDF kontrak. Pastikan wkhtmltopdf terpasang di server." };
+  }
 
   const emailHtml = `
     <div style="font-family:sans-serif;max-width:600px;margin:0 auto">
       <h2 style="color:#0d9488">Surat Perjanjian Sewa Kamar</h2>
       <p>Yth. <strong>${tenant.user.name}</strong>,</p>
       <p>Berikut kami kirimkan Surat Perjanjian Sewa Kamar (Kost) untuk kamar <strong>${tenant.room.roomNumber}</strong> di <strong>${profile.name}</strong>.</p>
-      <p>Silakan cetak kontrak, tanda tangani, dan tempel materai Rp10.000, lalu serahkan dokumen fisik ke pengelola.</p>
+      <p>File PDF kontrak terlampir pada email ini. Silakan cetak, tanda tangani, dan tempel materai Rp10.000, lalu serahkan dokumen fisik ke pengelola.</p>
       <p style="margin:24px 0">
         <a href="${viewUrl}" style="background:#0d9488;color:#fff;padding:12px 24px;text-decoration:none;border-radius:6px;display:inline-block">
-          Lihat &amp; Cetak Kontrak
+          Unduh Kontrak (PDF)
         </a>
       </p>
-      <p style="font-size:12px;color:#666">Gunakan fitur Print / Save as PDF di browser untuk menyimpan sebagai PDF.</p>
       <hr style="border:none;border-top:1px solid #eee;margin:24px 0" />
       <p style="font-size:12px;color:#999">${profile.name} — ${profile.phone || ""}</p>
     </div>`;
@@ -99,9 +108,9 @@ export async function sendContractEmail(tenantId: number) {
       html: emailHtml,
       attachments: [
         {
-          filename: `Kontrak_Sewa_${tenant.user.name.replace(/\s+/g, "_")}.html`,
-          content: html,
-          contentType: "text/html",
+          filename: pdfFilename,
+          content: pdfBuffer,
+          contentType: "application/pdf",
         },
       ],
     });

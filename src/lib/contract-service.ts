@@ -41,27 +41,40 @@ export function toContractTenant(tenant: {
 }
 
 const CONTRACT_STYLES = `
-  @page { margin: 2cm; }
-  body { font-family: "Times New Roman", Times, serif; font-size: 11pt; line-height: 1.5; color: #000; max-width: 21cm; margin: 0 auto; padding: 20px; }
-  h1 { text-align: center; font-size: 13pt; margin: 0; }
-  .kosan-name { text-align: center; font-size: 14pt; font-weight: bold; margin: 8px 0 16px; }
-  h2 { font-size: 11pt; margin: 16px 0 8px; }
-  p { margin: 6px 0; text-align: justify; }
-  .field-table { width: 100%; border-collapse: collapse; margin: 8px 0; }
-  .field-table td { padding: 3px 6px; vertical-align: top; }
-  .field-table .label { width: 180px; font-weight: normal; }
-  .party-label { font-weight: bold; margin-top: 12px; }
-  ol { padding-left: 20px; }
-  ol li { margin-bottom: 4px; text-align: justify; }
-  .signature { margin-top: 40px; display: flex; justify-content: space-between; }
-  .signature-box { width: 45%; text-align: center; }
-  .signature-line { margin-top: 60px; border-top: 1px solid #000; display: inline-block; min-width: 200px; }
+  @page { size: A4; margin: 2.54cm; }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    font-family: "Times New Roman", Times, serif;
+    font-size: 11pt;
+    line-height: 1.5;
+    color: #000;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  h1 { text-align: center; font-size: 13pt; font-weight: bold; margin: 0 0 14px; }
+  .kosan-name { text-align: center; font-size: 14pt; font-weight: bold; margin: 0 0 18px; letter-spacing: 0.5px; }
+  h2 { font-size: 11pt; font-weight: bold; margin: 20px 0 10px; }
+  p { margin: 8px 0; text-align: justify; }
+  .field-table { width: 100%; border-collapse: collapse; margin: 6px 0 14px; }
+  .field-table td { padding: 3px 0; vertical-align: top; line-height: 1.45; }
+  .field-table .label { width: 200px; padding-right: 16px; white-space: nowrap; }
+  .party-label { font-weight: bold; margin: 12px 0 16px; }
+  ol { padding-left: 24px; margin: 8px 0 12px; }
+  ol li { margin-bottom: 6px; text-align: justify; }
+  .signature { margin-top: 48px; display: table; width: 100%; table-layout: fixed; }
+  .signature-box { display: table-cell; width: 50%; text-align: center; vertical-align: top; padding: 0 12px; }
+  .signature-line { margin-top: 72px; border-top: 1px solid #000; display: inline-block; min-width: 200px; }
   .materai { color: #c00; font-style: italic; font-size: 10pt; }
-  .checklist { list-style: none; padding: 0; }
+  .checklist { list-style: none; padding: 0; margin: 8px 0; }
+  .checklist li { margin-bottom: 4px; }
   .checklist li::before { content: "☐ "; }
   .checklist li.checked::before { content: "☑ "; }
   .page-break { page-break-before: always; }
-  @media print { body { padding: 0; } }
+  @media print {
+    html, body { margin: 0; padding: 0; }
+  }
 `;
 
 export function buildContractHtml(

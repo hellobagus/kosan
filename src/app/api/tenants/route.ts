@@ -349,14 +349,16 @@ export async function PUT(request: NextRequest) {
       const {
         checkIn, dueDate, deposit, leaseDuration, occupantCount,
         discount, additionalFees, totalAmount, paidAmount, paymentStatus,
+        monthlyRent, emergencyPhone,
       } = body;
       const fees = parseAdditionalFees(additionalFees);
       const checkInDate = checkIn ? new Date(checkIn) : tenant.checkIn;
       const dueDateVal = dueDate ? new Date(dueDate) : tenant.dueDate;
+      const rent = monthlyRent != null ? parseFloat(monthlyRent) : parseAmount(tenant.monthlyRent);
       const total = totalAmount != null
         ? parseFloat(totalAmount)
         : calcTotalAmount({
-            monthlyRent: parseAmount(tenant.monthlyRent),
+            monthlyRent: rent,
             dailyPrice: tenant.room.dailyPrice ? parseAmount(tenant.room.dailyPrice) : null,
             isDaily: tenant.isDaily,
             leaseDuration: leaseDuration || tenant.leaseDuration || "1 Bulan",
@@ -376,6 +378,7 @@ export async function PUT(request: NextRequest) {
         data: {
           checkIn: checkInDate,
           dueDate: dueDateVal,
+          monthlyRent: rent,
           deposit: deposit != null ? parseFloat(deposit) : tenant.deposit,
           leaseDuration: leaseDuration || tenant.leaseDuration,
           occupantCount: occupantCount ? parseInt(occupantCount) : tenant.occupantCount,
@@ -385,6 +388,7 @@ export async function PUT(request: NextRequest) {
           paidAmount: paid,
           paymentStatus: payStatus as "UNPAID" | "PARTIAL" | "PAID",
           lastPaymentDate: paid > 0 ? new Date() : tenant.lastPaymentDate,
+          emergencyPhone: emergencyPhone !== undefined ? (emergencyPhone || null) : tenant.emergencyPhone,
         },
         include: { user: true, room: true },
       });

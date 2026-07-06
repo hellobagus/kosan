@@ -5,11 +5,16 @@ import Link from "next/link";
 import {
   Search, CheckCircle, XCircle, Mail, FileText, PenLine,
   Package, LogIn, Printer, RefreshCw, ChevronLeft, ChevronRight, Upload, ExternalLink,
+  Eye, Pencil, X,
 } from "lucide-react";
-import { Button, Card, CardBody, EmptyState, Badge } from "@/components/ui";
-import { cn, formatCurrency, formatShortDate } from "@/lib/utils";
-import { parseAmount } from "@/lib/tenant-utils";
+import { Button, Card, CardBody, EmptyState, Badge, Input, Select } from "@/components/ui";
+import { cn, formatCurrency, formatDate, formatShortDate } from "@/lib/utils";
+import {
+  parseAmount, formatGender, formatMarital, paymentStatusLabel,
+  parseAdditionalOccupants, toDateInput, LEASE_OPTIONS,
+} from "@/lib/tenant-utils";
 import { fetchAndPrintContract, fetchAndPrintInventoryBa } from "@/lib/contract-print";
+import type { TenantData } from "@/components/TenantBoard";
 
 const STATUS_LABELS: Record<string, string> = {
   PENDING: "Menunggu Verifikasi",
@@ -25,23 +30,43 @@ const STATUS_VARIANT: Record<string, "default" | "success" | "warning" | "danger
   CONTRACT_SIGNED: "success",
 };
 
-interface WorkflowTenant {
-  id: number;
-  status: string;
-  checkIn: string;
-  monthlyRent: string;
-  deposit: string;
-  leaseDuration: string | null;
-  contractSentAt: string | null;
-  contractSignedAt: string | null;
-  contractSignedUrl: string | null;
-  inventoryBaAt: string | null;
-  approvedAt: string | null;
-  user: { name: string; email: string; phone: string | null };
-  room: { roomNumber: string };
-}
+type WorkflowTenant = TenantData & {
+  contractSentAt?: string | null;
+  contractSignedAt?: string | null;
+  contractSignedUrl?: string | null;
+  inventoryBaAt?: string | null;
+  approvedAt?: string | null;
+  emergencyPhone?: string | null;
+  additionalOccupants?: unknown;
+};
+
+type ModalType = "detail" | "edit" | null;
 
 const WORKFLOW_STATUSES = ["PENDING", "APPROVED", "CONTRACT_SENT", "CONTRACT_SIGNED"];
+
+function Modal({ title, onClose, children, wide }: {
+  title: string; onClose: () => void; children: React.ReactNode; wide?: boolean;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" onClick={onClose}>
+      <div
+        className={cn(
+          "bg-white rounded-xl shadow-xl max-h-[90vh] overflow-y-auto w-full",
+          wide ? "max-w-2xl" : "max-w-lg"
+        )}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 sticky top-0 bg-white z-10">
+          <h2 className="text-lg font-bold text-slate-900">{title}</h2>
+          <button onClick={onClose} className="p-1 text-slate-400 hover:text-slate-600">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        <div className="p-6">{children}</div>
+      </div>
+    </div>
+  );
+}
 
 export default function TenantWorkflowBoard() {
   const [tenants, setTenants] = useState<WorkflowTenant[]>([]);
@@ -54,6 +79,15 @@ export default function TenantWorkflowBoard() {
   const pageSize = 10;
   const [signModal, setSignModal] = useState<WorkflowTenant | null>(null);
   const [signFile, setSignFile] = useState<File | null>(null);
+  const [modal, setModal] = useState<ModalType>(null);
+  const [selected, setSelected] = useState<WorkflowTenant | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [editForm, setEditForm] = useState({
+    name: "", phone: "", gender: "", ktp: "", maritalStatus: "", occupation: "",
+    ktpAddress: "", correspondenceAddress: "", workplace: "", workplaceAddress: "",
+    emergencyPhone: "", checkIn: "", monthlyRent: "", deposit: "", leaseDuration: "",
+    notes: "",
+  });
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -121,6 +155,95 @@ export default function TenantWorkflowBoard() {
       await fetchAndPrintInventoryBa(id, "checkin");
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "Gagal mencetak BA inventaris");
+    }
+  };
+
+  const openModal = (tenant: WorkflowTenant, type: ModalType) => {
+    setSelected(tenant);
+    setModal(type);
+    if (type === "edit") {
+      setEditForm({
+        name: tenant.user.name,
+        phone: tenant.user.phone || "",
+        gender: tenant.user.gender || "",
+        ktp: tenant.user.ktp || "",
+        maritalStatus: tenant.user.maritalStatus || "",
+        occupation: tenant.user.occupation || "",
+        ktpAddress: tenant.user.ktpAddress || "",
+        correspondenceAddress: tenant.user.correspondenceAddress || "",
+        workplace: tenant.user.workplace || "",
+        workplaceAddress: tenant.user.workplaceAddress || "",
+        emergencyPhone: tenant.emergencyPhone || "",
+        checkIn: toDateInput(tenant.checkIn),
+        monthlyRent: String(parseAmount(tenant.monthlyRent)),
+        deposit: String(parseAmount(tenant.deposit)),
+        leaseDuration: tenant.leaseDuration || "1 Bulan",
+        notes: tenant.notes || "",
+      });
+    }
+  };
+
+  const closeModal = () => {
+    setModal(null);
+    setSelected(null);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!selected) return;
+    setSaving(true);
+    setMessage("");
+    try {
+      const profileRes = await fetch("/api/tenants", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: selected.id,
+          action: "update_profile",
+          name: editForm.name,
+          phone: editForm.phone,
+          gender: editForm.gender,
+          ktp: editForm.ktp,
+          maritalStatus: editForm.maritalStatus,
+          occupation: editForm.occupation,
+          ktpAddress: editForm.ktpAddress,
+          correspondenceAddress: editForm.correspondenceAddress,
+          workplace: editForm.workplace,
+          workplaceAddress: editForm.workplaceAddress,
+          notes: editForm.notes,
+        }),
+      });
+      if (!profileRes.ok) {
+        const data = await profileRes.json();
+        setMessage(data.error || "Gagal menyimpan profil");
+        return;
+      }
+
+      const biayaRes = await fetch("/api/tenants", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: selected.id,
+          action: "update_biaya",
+          checkIn: editForm.checkIn,
+          monthlyRent: parseFloat(editForm.monthlyRent),
+          deposit: parseFloat(editForm.deposit || "0"),
+          leaseDuration: editForm.leaseDuration,
+          emergencyPhone: editForm.emergencyPhone,
+        }),
+      });
+      const biayaData = await biayaRes.json();
+      if (!biayaRes.ok) {
+        setMessage(biayaData.error || "Profil tersimpan, gagal menyimpan data sewa");
+        return;
+      }
+
+      setMessage("Data calon penghuni berhasil diperbarui");
+      closeModal();
+      load();
+    } catch {
+      setMessage("Gagal menyimpan perubahan");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -234,7 +357,7 @@ export default function TenantWorkflowBoard() {
                     <th className="px-4 py-3 text-left">Calon Penghuni</th>
                     <th className="px-4 py-3 text-left">Sewa</th>
                     <th className="px-4 py-3 text-left">Status</th>
-                    <th className="px-4 py-3 text-left w-56">Aksi Workflow</th>
+                    <th className="px-4 py-3 text-left w-64">Aksi Workflow</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -279,6 +402,16 @@ export default function TenantWorkflowBoard() {
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex flex-col gap-1">
+                            <div className="flex gap-1 mb-1">
+                              <Button variant="secondary" disabled={busy}
+                                onClick={() => openModal(t, "detail")} className="!py-1 !px-2 !text-xs flex-1">
+                                <Eye className="w-3 h-3" /> Detail
+                              </Button>
+                              <Button variant="ghost" disabled={busy}
+                                onClick={() => openModal(t, "edit")} className="!py-1 !px-2 !text-xs flex-1">
+                                <Pencil className="w-3 h-3" /> Edit
+                              </Button>
+                            </div>
                             {t.status === "PENDING" && (
                               <>
                                 <Button disabled={busy} onClick={() => runAction(t.id, "approve")}
@@ -357,6 +490,152 @@ export default function TenantWorkflowBoard() {
         Tanda tangan dilakukan secara manual (cetak → TTD + materai). Setelah check-in, penghuni muncul di{" "}
         <Link href="/penghuni/aktif" className="text-teal-600 hover:underline">Penghuni Aktif</Link>.
       </p>
+
+      {modal === "detail" && selected && (
+        <Modal title={`Detail Calon Penghuni — Kamar ${selected.room.roomNumber}`} onClose={closeModal} wide>
+          <div className="flex justify-between items-center mb-4">
+            <span className="text-sm text-slate-500">Status Workflow</span>
+            <Badge variant={STATUS_VARIANT[selected.status] || "default"}>
+              {STATUS_LABELS[selected.status] || selected.status}
+            </Badge>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 text-sm">
+            <div>
+              <h3 className="font-semibold mb-2 border-b pb-1">Data Penghuni</h3>
+              <dl className="space-y-1">
+                <div className="flex gap-2"><dt className="w-28 text-slate-500">Nama</dt><dd className="font-medium">{selected.user.name}</dd></div>
+                <div className="flex gap-2"><dt className="w-28 text-slate-500">Email</dt><dd>{selected.user.email}</dd></div>
+                <div className="flex gap-2"><dt className="w-28 text-slate-500">No. HP</dt><dd>{selected.user.phone || "-"}</dd></div>
+                <div className="flex gap-2"><dt className="w-28 text-slate-500">Kelamin</dt><dd>{formatGender(selected.user.gender)}</dd></div>
+                <div className="flex gap-2"><dt className="w-28 text-slate-500">No. KTP</dt><dd>{selected.user.ktp || "-"}</dd></div>
+                <div className="flex gap-2"><dt className="w-28 text-slate-500">Status</dt><dd>{formatMarital(selected.user.maritalStatus)}</dd></div>
+                <div className="flex gap-2"><dt className="w-28 text-slate-500">Pekerjaan</dt><dd>{selected.user.occupation || "-"}</dd></div>
+                <div className="flex gap-2"><dt className="w-28 text-slate-500">Alamat KTP</dt><dd>{selected.user.ktpAddress || "-"}</dd></div>
+                <div className="flex gap-2"><dt className="w-28 text-slate-500">Korespondensi</dt><dd>{selected.user.correspondenceAddress || "-"}</dd></div>
+                <div className="flex gap-2"><dt className="w-28 text-slate-500">Tempat Kerja</dt><dd>{selected.user.workplace || "-"}</dd></div>
+                <div className="flex gap-2"><dt className="w-28 text-slate-500">Kontak Darurat</dt><dd>{selected.emergencyPhone || "-"}</dd></div>
+              </dl>
+            </div>
+            <div>
+              <h3 className="font-semibold mb-2 border-b pb-1">Data Sewa</h3>
+              <dl className="space-y-1">
+                <div className="flex gap-2"><dt className="w-28 text-slate-500">Kamar</dt><dd className="font-medium">{selected.room.roomNumber}</dd></div>
+                <div className="flex gap-2"><dt className="w-28 text-slate-500">Masuk</dt><dd>{formatDate(selected.checkIn)}</dd></div>
+                <div className="flex gap-2"><dt className="w-28 text-slate-500">Lama Sewa</dt><dd>{selected.leaseDuration || "-"}</dd></div>
+                <div className="flex gap-2"><dt className="w-28 text-slate-500">Harga/Bulan</dt><dd>{formatCurrency(selected.monthlyRent)}</dd></div>
+                <div className="flex gap-2"><dt className="w-28 text-slate-500">Deposit</dt><dd>{formatCurrency(selected.deposit)}</dd></div>
+                <div className="flex gap-2"><dt className="w-28 text-slate-500">Total</dt><dd>{formatCurrency(selected.totalAmount || selected.monthlyRent)}</dd></div>
+                <div className="flex gap-2"><dt className="w-28 text-slate-500">Pembayaran</dt><dd>{paymentStatusLabel(selected.paymentStatus)}</dd></div>
+                <div className="flex gap-2"><dt className="w-28 text-slate-500">Penghuni</dt><dd>{selected.occupantCount} orang</dd></div>
+              </dl>
+              {(selected.contractSentAt || selected.contractSignedAt) && (
+                <div className="mt-4">
+                  <h3 className="font-semibold mb-2 border-b pb-1">Kontrak</h3>
+                  <dl className="space-y-1">
+                    {selected.contractSentAt && (
+                      <div className="flex gap-2"><dt className="w-28 text-slate-500">Dikirim</dt><dd>{formatShortDate(selected.contractSentAt)}</dd></div>
+                    )}
+                    {selected.contractSignedAt && (
+                      <div className="flex gap-2"><dt className="w-28 text-slate-500">TTD</dt><dd>{formatShortDate(selected.contractSignedAt)}</dd></div>
+                    )}
+                    {selected.contractSignedUrl && (
+                      <div className="flex gap-2"><dt className="w-28 text-slate-500">Scan</dt>
+                        <dd><a href={selected.contractSignedUrl} target="_blank" rel="noopener noreferrer" className="text-teal-600 hover:underline">Lihat dokumen</a></dd>
+                      </div>
+                    )}
+                  </dl>
+                </div>
+              )}
+            </div>
+          </div>
+          {parseAdditionalOccupants(selected.additionalOccupants).length > 0 && (
+            <div className="mt-4">
+              <h3 className="font-semibold mb-2 border-b pb-1 text-sm">Penghuni Tambahan</h3>
+              <ul className="text-sm space-y-1">
+                {parseAdditionalOccupants(selected.additionalOccupants).map((o, i) => (
+                  <li key={i}>{o.name} — KTP: {o.ktp || "-"}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {selected.notes && (
+            <div className="mt-4 text-sm">
+              <h3 className="font-semibold mb-1">Catatan</h3>
+              <p className="text-slate-600 whitespace-pre-wrap">{selected.notes}</p>
+            </div>
+          )}
+          <div className="flex gap-2 mt-6 justify-end">
+            <Button variant="secondary" onClick={() => { closeModal(); openModal(selected, "edit"); }}>
+              <Pencil className="w-4 h-4" /> Edit Data
+            </Button>
+            <Button variant="ghost" onClick={closeModal}>Tutup</Button>
+          </div>
+        </Modal>
+      )}
+
+      {modal === "edit" && selected && (
+        <Modal title={`Edit Calon Penghuni — Kamar ${selected.room.roomNumber}`} onClose={closeModal} wide>
+          <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded px-3 py-2 mb-4">
+            Kamar tidak dapat diubah dari halaman ini. Ubah data sebelum menyetujui atau kirim kontrak.
+          </p>
+          <h3 className="font-semibold text-sm mb-3">Data Penghuni</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Input label="Nama *" value={editForm.name}
+              onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} />
+            <Input label="No. HP" value={editForm.phone}
+              onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} />
+            <Select label="Kelamin" value={editForm.gender}
+              onChange={(e) => setEditForm({ ...editForm, gender: e.target.value })}>
+              <option value="">Pilih</option>
+              <option value="FEMALE">Wanita</option>
+              <option value="MALE">Pria</option>
+            </Select>
+            <Input label="No. KTP" value={editForm.ktp}
+              onChange={(e) => setEditForm({ ...editForm, ktp: e.target.value })} />
+            <Select label="Status" value={editForm.maritalStatus}
+              onChange={(e) => setEditForm({ ...editForm, maritalStatus: e.target.value })}>
+              <option value="">Pilih</option>
+              <option value="SINGLE">Belum Menikah</option>
+              <option value="MARRIED">Menikah</option>
+            </Select>
+            <Input label="Pekerjaan" value={editForm.occupation}
+              onChange={(e) => setEditForm({ ...editForm, occupation: e.target.value })} />
+            <Input label="Kontak Darurat" value={editForm.emergencyPhone}
+              onChange={(e) => setEditForm({ ...editForm, emergencyPhone: e.target.value })} />
+          </div>
+          <div className="mt-4 space-y-4">
+            <Input label="Alamat KTP" value={editForm.ktpAddress}
+              onChange={(e) => setEditForm({ ...editForm, ktpAddress: e.target.value })} />
+            <Input label="Alamat Korespondensi" value={editForm.correspondenceAddress}
+              onChange={(e) => setEditForm({ ...editForm, correspondenceAddress: e.target.value })} />
+            <Input label="Tempat Kerja" value={editForm.workplace}
+              onChange={(e) => setEditForm({ ...editForm, workplace: e.target.value })} />
+            <Input label="Alamat Tempat Kerja" value={editForm.workplaceAddress}
+              onChange={(e) => setEditForm({ ...editForm, workplaceAddress: e.target.value })} />
+          </div>
+          <h3 className="font-semibold text-sm mt-6 mb-3">Data Sewa</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Input label="Tanggal Masuk" type="date" value={editForm.checkIn}
+              onChange={(e) => setEditForm({ ...editForm, checkIn: e.target.value })} />
+            <Select label="Lama Sewa" value={editForm.leaseDuration}
+              onChange={(e) => setEditForm({ ...editForm, leaseDuration: e.target.value })}>
+              {LEASE_OPTIONS.filter((o) => o.value !== "1 Hari").map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </Select>
+            <Input label="Harga Sewa / Bulan" type="number" value={editForm.monthlyRent}
+              onChange={(e) => setEditForm({ ...editForm, monthlyRent: e.target.value })} />
+            <Input label="Deposit" type="number" value={editForm.deposit}
+              onChange={(e) => setEditForm({ ...editForm, deposit: e.target.value })} />
+          </div>
+          <div className="flex gap-3 mt-6 justify-end">
+            <Button variant="secondary" onClick={closeModal}>Batal</Button>
+            <Button disabled={saving || !editForm.name} onClick={handleSaveEdit}>
+              {saving ? "Menyimpan..." : "Simpan Perubahan"}
+            </Button>
+          </div>
+        </Modal>
+      )}
 
       {signModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">

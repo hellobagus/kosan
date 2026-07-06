@@ -6,7 +6,7 @@ import { buildContractHtml, toContractTenant } from "@/lib/contract-service";
 import { kosanProfileToContractProfile } from "@/lib/contract-profile";
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -30,10 +30,29 @@ export async function GET(
       toContractTenant(tenant)
     );
 
+    const format = request.nextUrl.searchParams.get("format");
+    const safeName = tenant.user.name.replace(/\s+/g, "-");
+
+    if (format === "pdf") {
+      const { htmlToPdfBuffer } = await import("@/lib/contract-pdf");
+      try {
+        const pdf = await htmlToPdfBuffer(html);
+        return new NextResponse(new Uint8Array(pdf), {
+          headers: {
+            "Content-Type": "application/pdf",
+            "Content-Disposition": `inline; filename="kontrak-${safeName}.pdf"`,
+          },
+        });
+      } catch (err) {
+        console.error("Contract PDF error:", err);
+        return NextResponse.json({ error: "Gagal membuat PDF kontrak" }, { status: 500 });
+      }
+    }
+
     return new NextResponse(html, {
       headers: {
         "Content-Type": "text/html; charset=utf-8",
-        "Content-Disposition": `inline; filename="kontrak-${tenant.user.name.replace(/\s+/g, "-")}.html"`,
+        "Content-Disposition": `inline; filename="kontrak-${safeName}.html"`,
       },
     });
   } catch (error) {

@@ -39,7 +39,14 @@ export async function sendEmail(options: SendEmailOptions): Promise<{ ok: boolea
     return { ok: false, error: "SMTP belum dikonfigurasi. Atur SMTP_HOST, SMTP_USER, SMTP_PASS di .env" };
   }
 
-  const from = process.env.SMTP_FROM || process.env.SMTP_USER;
+  const fromName = process.env.SMTP_FROM?.trim();
+  const fromUser = process.env.SMTP_USER;
+  const from =
+    fromName && fromName.includes("@")
+      ? fromName
+      : fromUser
+        ? `${fromName || "Kosanku"} <${fromUser}>`
+        : fromName || "Kosanku";
 
   try {
     await transporter.sendMail({
