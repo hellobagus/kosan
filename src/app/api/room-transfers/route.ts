@@ -1,10 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { createRoomTransferRequest, listRoomTransfers } from "@/lib/room-transfer-service";
+import { requireProjectContext } from "@/lib/project-context";
 
 export async function GET() {
   try {
-    const transfers = await listRoomTransfers();
+    const auth = await requireProjectContext();
+    if ("error" in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
+
+    const transfers = await listRoomTransfers(auth.context.projectId);
     return NextResponse.json(transfers);
   } catch (error) {
     console.error("RoomTransfers GET error:", error);

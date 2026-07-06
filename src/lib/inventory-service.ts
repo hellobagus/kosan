@@ -76,7 +76,8 @@ export async function deployInventoryItemsToRoom(
   return { deployed, requested };
 }
 
-export function generatePurchaseNumber(): string {
+/** @deprecated use generatePurchaseNumber from document-number.ts */
+export function generatePurchaseNumberLegacy(): string {
   const now = new Date();
   const y = now.getFullYear().toString().slice(-2);
   const m = String(now.getMonth() + 1).padStart(2, "0");
@@ -701,7 +702,14 @@ export async function reactivateAsset(assetId: number, userId?: number) {
   });
 }
 
-export async function getInventoryStats() {
+export async function getInventoryStats(projectId?: number) {
+  const roomWhere = projectId
+    ? { floorRef: { building: { projectId } } }
+    : {};
+  const assetWhere = projectId
+    ? { OR: [{ room: roomWhere }, { item: { projectId } }] }
+    : {};
+
   const [
     totalRooms,
     totalAssets,
@@ -709,12 +717,12 @@ export async function getInventoryStats() {
     maintenanceOpen,
     assetValue,
   ] = await Promise.all([
-    prisma.room.count(),
-    prisma.roomAsset.count({ where: { status: { not: "RETIRED" } } }),
-    prisma.roomAsset.count({ where: { status: "DAMAGED" } }),
+    prisma.room.count({ where: roomWhere }),
+    prisma.roomAsset.count({ where: { ...assetWhere, status: { not: "RETIRED" } } }),
+    prisma.roomAsset.count({ where: { ...assetWhere, status: "DAMAGED" } }),
     prisma.assetMaintenance.count({ where: { status: { in: ["OPEN", "IN_PROGRESS"] } } }),
     prisma.roomAsset.aggregate({
-      where: { status: { not: "RETIRED" } },
+      where: { ...assetWhere, status: { not: "RETIRED" } },
       _sum: { purchasePrice: true },
     }),
   ]);

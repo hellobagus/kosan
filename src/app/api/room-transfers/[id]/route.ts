@@ -6,6 +6,7 @@ import {
   cancelRoomTransfer,
   completeRoomTransfer,
   closeOldRoomMeters,
+  deleteRoomTransfer,
   generateRoomTransferLetter,
   handoverNewRoom,
   inspectOldRoomForTransfer,
@@ -79,6 +80,24 @@ export async function PUT(
     return NextResponse.json({ error: "Aksi tidak valid" }, { status: 400 });
   } catch (error) {
     console.error("RoomTransfers PUT error:", error);
+    const message = error instanceof Error ? error.message : "Server error";
+    return NextResponse.json({ error: message }, { status: 400 });
+  }
+}
+
+export async function DELETE(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await getSession();
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const { id } = await params;
+    const result = await deleteRoomTransfer(parseInt(id, 10));
+    return NextResponse.json(result);
+  } catch (error) {
+    console.error("RoomTransfers DELETE error:", error);
     const message = error instanceof Error ? error.message : "Server error";
     return NextResponse.json({ error: message }, { status: 400 });
   }

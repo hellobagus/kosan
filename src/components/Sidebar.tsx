@@ -83,6 +83,7 @@ const navigation = [
     name: "Pengaturan",
     icon: Settings,
     children: [
+      { name: "Struktur Organisasi", href: "/pengaturan/organisasi" },
       { name: "Profil Kosan", href: "/pengaturan/profil" },
       { name: "Template Kontrak", href: "/pengaturan/template-kontrak" },
       { name: "Pengaturan Kosan", href: "/pengaturan/kosan" },

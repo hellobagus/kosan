@@ -1,6 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { calcDueDate, calcTotalAmount } from "../src/lib/tenant-utils";
+import { ensureDefaultOrganization } from "../src/lib/organization-service";
 
 const prisma = new PrismaClient();
 
@@ -50,56 +51,65 @@ async function main() {
 
   const tenantPassword = await bcrypt.hash("penghuni123", 10);
 
+  async function upsertRoom(data: {
+    roomNumber: string;
+    floor: number;
+    price: number;
+    dailyPrice?: number;
+    facilities?: string;
+    status?: "AVAILABLE" | "OCCUPIED" | "MAINTENANCE";
+  }) {
+    const existing = await prisma.room.findFirst({ where: { roomNumber: data.roomNumber } });
+    if (existing) {
+      return prisma.room.update({
+        where: { id: existing.id },
+        data: {
+          price: data.price,
+          dailyPrice: data.dailyPrice,
+          facilities: data.facilities,
+          status: data.status,
+          floor: data.floor,
+        },
+      });
+    }
+    return prisma.room.create({
+      data: {
+        roomNumber: data.roomNumber,
+        floor: data.floor,
+        price: data.price,
+        dailyPrice: data.dailyPrice,
+        facilities: data.facilities,
+        status: data.status || "AVAILABLE",
+      },
+    });
+  }
+
   const rooms = await Promise.all([
-    prisma.room.upsert({
-      where: { roomNumber: "01" },
-      update: { price: 900000, dailyPrice: 100000 },
-      create: {
-        roomNumber: "01", floor: 1, price: 900000, dailyPrice: 100000,
-        facilities: "Kasur 120x200\nAlmari\nMeja kursi\nKamar mandi dalam",
-        status: "AVAILABLE",
-      },
+    upsertRoom({
+      roomNumber: "01", floor: 1, price: 900000, dailyPrice: 100000,
+      facilities: "Kasur 120x200\nAlmari\nMeja kursi\nKamar mandi dalam",
+      status: "AVAILABLE",
     }),
-    prisma.room.upsert({
-      where: { roomNumber: "02" },
-      update: {},
-      create: {
-        roomNumber: "02", floor: 1, price: 900000, dailyPrice: 100000,
-        facilities: "Kasur 120x200\nAlmari", status: "AVAILABLE",
-      },
+    upsertRoom({
+      roomNumber: "02", floor: 1, price: 900000, dailyPrice: 100000,
+      facilities: "Kasur 120x200\nAlmari", status: "AVAILABLE",
     }),
-    prisma.room.upsert({
-      where: { roomNumber: "03" },
-      update: {},
-      create: {
-        roomNumber: "03", floor: 1, price: 850000, dailyPrice: 95000,
-        facilities: "Kasur 120x200\nAlmari", status: "AVAILABLE",
-      },
+    upsertRoom({
+      roomNumber: "03", floor: 1, price: 850000, dailyPrice: 95000,
+      facilities: "Kasur 120x200\nAlmari", status: "AVAILABLE",
     }),
-    prisma.room.upsert({
-      where: { roomNumber: "123" },
-      update: { price: 1700000, dailyPrice: 70000, status: "OCCUPIED" },
-      create: {
-        roomNumber: "123", floor: 1, price: 1700000, dailyPrice: 70000,
-        facilities: "Kasur 120x200\nAlmari\nAC\nKamar mandi dalam",
-        status: "OCCUPIED",
-      },
+    upsertRoom({
+      roomNumber: "123", floor: 1, price: 1700000, dailyPrice: 70000,
+      facilities: "Kasur 120x200\nAlmari\nAC\nKamar mandi dalam",
+      status: "OCCUPIED",
     }),
-    prisma.room.upsert({
-      where: { roomNumber: "A1" },
-      update: { price: 1200000, status: "OCCUPIED" },
-      create: {
-        roomNumber: "A1", floor: 2, price: 1200000, dailyPrice: 120000,
-        facilities: "Kasur 120x200\nAlmari\nAC", status: "OCCUPIED",
-      },
+    upsertRoom({
+      roomNumber: "A1", floor: 2, price: 1200000, dailyPrice: 120000,
+      facilities: "Kasur 120x200\nAlmari\nAC", status: "OCCUPIED",
     }),
-    prisma.room.upsert({
-      where: { roomNumber: "B01" },
-      update: {},
-      create: {
-        roomNumber: "B01", floor: 2, price: 1100000, dailyPrice: 110000,
-        facilities: "Kasur 120x200\nWiFi", status: "AVAILABLE",
-      },
+    upsertRoom({
+      roomNumber: "B01", floor: 2, price: 1100000, dailyPrice: 110000,
+      facilities: "Kasur 120x200\nWiFi", status: "AVAILABLE",
     }),
   ]);
 
@@ -412,6 +422,9 @@ async function main() {
     where: { roomNumber: { in: ["123", "A1"] } },
     data: { templateId: deluxeTemplate.id },
   });
+
+  await ensureDefaultOrganization();
+  console.log("Organisasi default (Holding/Entity/Project/Gedung/Lantai) siap.");
 
   console.log("Seed completed!");
   console.log("Admin: admin@kosanku.com / admin123");

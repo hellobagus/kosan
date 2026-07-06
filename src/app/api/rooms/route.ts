@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getSession } from "@/lib/auth";
 import { buildInventoryTextLines, deployInventoryItemsToRoom } from "@/lib/inventory-service";
+import { requireProjectContext, roomProjectFilter } from "@/lib/project-context";
 
 async function resolveInventoryTexts(
   body: {
@@ -52,17 +52,45 @@ async function resolveInventoryTexts(
   };
 }
 
+async function resolveFloorId(
+  projectId: number,
+  floorId?: number | string,
+  floorLevel?: number | string
+): Promise<number | null> {
+  if (floorId) {
+    const floor = await prisma.floor.findFirst({
+      where: { id: parseInt(String(floorId), 10), building: { projectId } },
+    });
+    return floor?.id ?? null;
+  }
+  const level = parseInt(String(floorLevel || 1), 10);
+  const floor = await prisma.floor.findFirst({
+    where: { level, building: { projectId } },
+    orderBy: { id: "asc" },
+  });
+  return floor?.id ?? null;
+}
+
 export async function GET(request: NextRequest) {
   try {
+    const auth = await requireProjectContext();
+    if ("error" in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
+
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status");
 
-    const where = status ? { status: status as "AVAILABLE" | "OCCUPIED" | "MAINTENANCE" } : {};
+    const where: Record<string, unknown> = {
+      ...roomProjectFilter(auth.context.projectId),
+    };
+    if (status) where.status = status;
 
     const rooms = await prisma.room.findMany({
       where,
       include: {
         template: { select: { id: true, name: true } },
+        floorRef: { select: { id: true, name: true, level: true, building: { select: { id: true, name: true, code: true } } } },
         tenants: {
           where: { status: "ACTIVE" },
           include: { user: true },
@@ -80,12 +108,14 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getSession();
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireProjectContext();
+    if ("error" in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
 
     const body = await request.json();
     const {
-      roomNumber, floor, price, dailyPrice, facilities, equipment, description,
+      roomNumber, floor, floorId, price, dailyPrice, facilities, equipment, description,
       templateId, inventoryFacilities, inventoryEquipment, customFacilities, customEquipment, autoDeploy,
     } = body;
 
@@ -93,9 +123,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Nomor kamar dan harga wajib diisi" }, { status: 400 });
     }
 
-    const existing = await prisma.room.findUnique({ where: { roomNumber } });
+    const resolvedFloorId = await resolveFloorId(auth.context.projectId, floorId, floor);
+    if (!resolvedFloorId) {
+      return NextResponse.json({ error: "Lantai tidak ditemukan. Buat gedung/lantai di Pengaturan > Struktur Organisasi" }, { status: 400 });
+    }
+
+    const floorRow = await prisma.floor.findUnique({ where: { id: resolvedFloorId } });
+    const existing = await prisma.room.findFirst({
+      where: { floorId: resolvedFloorId, roomNumber },
+    });
     if (existing) {
-      return NextResponse.json({ error: "Nomor kamar sudah ada" }, { status: 400 });
+      return NextResponse.json({ error: "Nomor kamar sudah ada di lantai ini" }, { status: 400 });
     }
 
     const resolved = await resolveInventoryTexts({
@@ -105,7 +143,8 @@ export async function POST(request: NextRequest) {
     const room = await prisma.room.create({
       data: {
         roomNumber,
-        floor: parseInt(floor) || 1,
+        floorId: resolvedFloorId,
+        floor: floorRow?.level || parseInt(floor) || 1,
         price: parseFloat(price),
         dailyPrice: dailyPrice ? parseFloat(dailyPrice) : null,
         facilities: resolved.facilities,
@@ -113,12 +152,15 @@ export async function POST(request: NextRequest) {
         description: description || null,
         templateId: templateId ? parseInt(templateId) : null,
       },
-      include: { template: { select: { id: true, name: true } } },
+      include: {
+        template: { select: { id: true, name: true } },
+        floorRef: { select: { id: true, name: true, level: true } },
+      },
     });
 
     let deployResult = null;
     if (autoDeploy && resolved.deployItems.length > 0) {
-      deployResult = await deployInventoryItemsToRoom(room.id, resolved.deployItems, session.userId);
+      deployResult = await deployInventoryItemsToRoom(room.id, resolved.deployItems, auth.session.userId);
     }
 
     return NextResponse.json({ ...room, deployResult }, { status: 201 });
@@ -130,11 +172,18 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    const session = await getSession();
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireProjectContext();
+    if ("error" in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
 
     const body = await request.json();
-    const { id, templateId, inventoryFacilities, inventoryEquipment, customFacilities, customEquipment, autoDeploy, ...data } = body;
+    const { id, templateId, floorId, inventoryFacilities, inventoryEquipment, customFacilities, customEquipment, autoDeploy, ...data } = body;
+
+    const roomCheck = await prisma.room.findFirst({
+      where: { id: parseInt(id), ...roomProjectFilter(auth.context.projectId) },
+    });
+    if (!roomCheck) return NextResponse.json({ error: "Kamar tidak ditemukan" }, { status: 404 });
 
     const resolved = await resolveInventoryTexts({
       facilities: data.facilities,
@@ -145,11 +194,19 @@ export async function PUT(request: NextRequest) {
       customEquipment,
     });
 
+    let newFloorId = roomCheck.floorId;
+    if (floorId || data.floor) {
+      const resolvedFloorId = await resolveFloorId(auth.context.projectId, floorId, data.floor);
+      if (resolvedFloorId) newFloorId = resolvedFloorId;
+    }
+    const floorRow = newFloorId ? await prisma.floor.findUnique({ where: { id: newFloorId } }) : null;
+
     const room = await prisma.room.update({
       where: { id: parseInt(id) },
       data: {
         roomNumber: data.roomNumber,
-        floor: data.floor ? parseInt(data.floor) : undefined,
+        floorId: newFloorId,
+        floor: floorRow?.level ?? (data.floor ? parseInt(data.floor) : undefined),
         price: data.price ? parseFloat(data.price) : undefined,
         dailyPrice: data.dailyPrice !== undefined
           ? (data.dailyPrice ? parseFloat(data.dailyPrice) : null)
@@ -160,12 +217,15 @@ export async function PUT(request: NextRequest) {
         description: data.description !== undefined ? (data.description || null) : undefined,
         templateId: templateId !== undefined ? (templateId ? parseInt(templateId) : null) : undefined,
       },
-      include: { template: { select: { id: true, name: true } } },
+      include: {
+        template: { select: { id: true, name: true } },
+        floorRef: { select: { id: true, name: true, level: true } },
+      },
     });
 
     let deployResult = null;
     if (autoDeploy && resolved.deployItems.length > 0) {
-      deployResult = await deployInventoryItemsToRoom(room.id, resolved.deployItems, session.userId);
+      deployResult = await deployInventoryItemsToRoom(room.id, resolved.deployItems, auth.session.userId);
     }
 
     return NextResponse.json({ ...room, deployResult });
@@ -177,9 +237,19 @@ export async function PUT(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    const auth = await requireProjectContext();
+    if ("error" in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
+
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
     if (!id) return NextResponse.json({ error: "ID required" }, { status: 400 });
+
+    const roomCheck = await prisma.room.findFirst({
+      where: { id: parseInt(id), ...roomProjectFilter(auth.context.projectId) },
+    });
+    if (!roomCheck) return NextResponse.json({ error: "Kamar tidak ditemukan" }, { status: 404 });
 
     const activeTenant = await prisma.tenant.findFirst({
       where: { roomId: parseInt(id), status: "ACTIVE" },

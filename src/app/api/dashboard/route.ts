@@ -1,15 +1,17 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getSession } from "@/lib/auth";
 import { getInventoryStats } from "@/lib/inventory-service";
+import { requireProjectContext, roomProjectFilter } from "@/lib/project-context";
 
 export async function GET() {
   try {
-    const session = await getSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireProjectContext();
+    if ("error" in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
 
+    const projectId = auth.context.projectId;
+    const roomFilter = roomProjectFilter(projectId);
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const startOfYear = new Date(now.getFullYear(), 0, 1);
@@ -26,37 +28,41 @@ export async function GET() {
       recentFinances,
       inventoryStats,
     ] = await Promise.all([
-      prisma.room.count(),
-      prisma.room.count({ where: { status: "OCCUPIED" } }),
-      prisma.room.count({ where: { status: "AVAILABLE" } }),
-      prisma.tenant.count({ where: { status: "ACTIVE" } }),
+      prisma.room.count({ where: roomFilter }),
+      prisma.room.count({ where: { ...roomFilter, status: "OCCUPIED" } }),
+      prisma.room.count({ where: { ...roomFilter, status: "AVAILABLE" } }),
+      prisma.tenant.count({
+        where: { status: "ACTIVE", room: roomFilter },
+      }),
       prisma.finance.aggregate({
-        where: { type: "INCOME", transactionDate: { gte: startOfMonth } },
+        where: { type: "INCOME", projectId, transactionDate: { gte: startOfMonth } },
         _sum: { amount: true },
       }),
       prisma.finance.aggregate({
-        where: { type: "EXPENSE", transactionDate: { gte: startOfMonth } },
+        where: { type: "EXPENSE", projectId, transactionDate: { gte: startOfMonth } },
         _sum: { amount: true },
       }),
       prisma.finance.aggregate({
-        where: { type: "INCOME", transactionDate: { gte: startOfYear } },
+        where: { type: "INCOME", projectId, transactionDate: { gte: startOfYear } },
         _sum: { amount: true },
       }),
       prisma.tenant.findMany({
-        where: { status: "ACTIVE" },
+        where: { status: "ACTIVE", room: roomFilter },
         include: { user: true, room: true },
         orderBy: { checkIn: "desc" },
         take: 5,
       }),
       prisma.finance.findMany({
+        where: { projectId },
         orderBy: { transactionDate: "desc" },
         take: 5,
         include: { tenant: { include: { user: true } } },
       }),
-      getInventoryStats(),
+      getInventoryStats(projectId),
     ]);
 
     return NextResponse.json({
+      context: auth.context,
       stats: {
         totalRooms,
         occupiedRooms,

@@ -1,14 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getSession } from "@/lib/auth";
-import { generatePurchaseNumber, receivePurchase } from "@/lib/inventory-service";
+import { receivePurchase } from "@/lib/inventory-service";
+import { requireProjectContext } from "@/lib/project-context";
+import { generatePurchaseNumber } from "@/lib/document-number";
 
 export async function GET(request: NextRequest) {
   try {
+    const auth = await requireProjectContext();
+    if ("error" in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
+
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status");
 
-    const where = status ? { status: status as "DRAFT" | "ORDERED" | "RECEIVED" | "CANCELLED" } : {};
+    const where: Record<string, unknown> = { projectId: auth.context.projectId };
+    if (status) where.status = status;
 
     const purchases = await prisma.purchase.findMany({
       where,
@@ -28,8 +35,10 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getSession();
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireProjectContext();
+    if ("error" in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
 
     const { supplierId, purchaseDate, notes, items, action } = await request.json();
     if (!items || items.length === 0) {
@@ -48,15 +57,21 @@ export async function POST(request: NextRequest) {
       };
     });
 
+    const purchaseNumber = await generatePurchaseNumber(
+      auth.context.entityId,
+      auth.context.projectId
+    );
+
     const purchase = await prisma.purchase.create({
       data: {
-        purchaseNumber: generatePurchaseNumber(),
+        projectId: auth.context.projectId,
+        purchaseNumber,
         supplierId: supplierId ? parseInt(supplierId) : null,
         purchaseDate: purchaseDate ? new Date(purchaseDate) : new Date(),
         totalAmount,
         status: "ORDERED",
         notes: notes || null,
-        createdBy: session.userId,
+        createdBy: auth.session.userId,
         items: { create: purchaseItems },
       },
       include: {
@@ -66,7 +81,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (action === "receive") {
-      await receivePurchase(purchase.id, session.userId);
+      await receivePurchase(purchase.id, auth.session.userId);
       const updated = await prisma.purchase.findUnique({
         where: { id: purchase.id },
         include: { supplier: true, items: { include: { item: true } } },
@@ -83,14 +98,21 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    const session = await getSession();
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireProjectContext();
+    if ("error" in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
 
     const { id, action } = await request.json();
     if (!id) return NextResponse.json({ error: "ID required" }, { status: 400 });
 
+    const existing = await prisma.purchase.findFirst({
+      where: { id: parseInt(id), projectId: auth.context.projectId },
+    });
+    if (!existing) return NextResponse.json({ error: "Pembelian tidak ditemukan" }, { status: 404 });
+
     if (action === "receive") {
-      await receivePurchase(parseInt(id), session.userId);
+      await receivePurchase(parseInt(id), auth.session.userId);
       const purchase = await prisma.purchase.findUnique({
         where: { id: parseInt(id) },
         include: { supplier: true, items: { include: { item: true } } },

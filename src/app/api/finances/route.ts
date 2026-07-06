@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getSession } from "@/lib/auth";
+import { requireProjectContext } from "@/lib/project-context";
 
 export async function GET(request: NextRequest) {
   try {
+    const auth = await requireProjectContext();
+    if ("error" in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
+
     const { searchParams } = new URL(request.url);
     const type = searchParams.get("type");
     const month = searchParams.get("month");
@@ -11,7 +16,9 @@ export async function GET(request: NextRequest) {
     const startDate = searchParams.get("startDate");
     const endDate = searchParams.get("endDate");
 
-    const where: Record<string, unknown> = {};
+    const where: Record<string, unknown> = {
+      projectId: auth.context.projectId,
+    };
 
     if (type) where.type = type;
 
@@ -51,8 +58,10 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getSession();
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireProjectContext();
+    if ("error" in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
 
     const body = await request.json();
     const { type, amount, description, category, transactionDate, tenantId, roomId } = body;
@@ -70,7 +79,8 @@ export async function POST(request: NextRequest) {
         transactionDate: transactionDate ? new Date(transactionDate) : new Date(),
         tenantId: tenantId ? parseInt(tenantId) : null,
         roomId: roomId ? parseInt(roomId) : null,
-        createdBy: session.userId,
+        projectId: auth.context.projectId,
+        createdBy: auth.session.userId,
       },
       include: {
         tenant: { include: { user: true } },
@@ -87,9 +97,19 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    const auth = await requireProjectContext();
+    if ("error" in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
+
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
     if (!id) return NextResponse.json({ error: "ID required" }, { status: 400 });
+
+    const existing = await prisma.finance.findFirst({
+      where: { id: parseInt(id), projectId: auth.context.projectId },
+    });
+    if (!existing) return NextResponse.json({ error: "Transaksi tidak ditemukan" }, { status: 404 });
 
     await prisma.finance.delete({ where: { id: parseInt(id) } });
     return NextResponse.json({ message: "Transaksi berhasil dihapus" });

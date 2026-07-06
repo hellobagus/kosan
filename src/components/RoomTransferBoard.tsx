@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { ArrowRightLeft, Check, FileText, Printer, RefreshCw, X } from "lucide-react";
+import { ArrowRightLeft, Check, FileText, Printer, RefreshCw, Trash2, X } from "lucide-react";
 import { Button, Card, CardBody, EmptyState, Input, PageHeader, Select } from "@/components/ui";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { toDateInput as dateInputUtil } from "@/lib/tenant-utils";
@@ -136,7 +136,7 @@ export default function RoomTransferBoard() {
       const [transferRes, tenantRes, roomRes, utilityRes] = await Promise.all([
         fetch("/api/room-transfers"),
         fetch("/api/tenants?status=ACTIVE"),
-        fetch("/api/rooms"),
+        fetch("/api/rooms?status=AVAILABLE"),
         fetch("/api/room-utilities"),
       ]);
       const [transferData, tenantData, roomData, utilityData] = await Promise.all([
@@ -216,7 +216,9 @@ export default function RoomTransferBoard() {
 
   const availableRooms = useMemo(() => {
     const tenant = tenants.find((item) => String(item.id) === createForm.tenantId);
-    return rooms.filter((room) => room.status !== "MAINTENANCE" && room.id !== tenant?.room.id);
+    return rooms.filter(
+      (room) => room.status === "AVAILABLE" && room.id !== tenant?.room.id
+    );
   }, [createForm.tenantId, rooms, tenants]);
 
   const submitCreate = async () => {
@@ -277,6 +279,28 @@ export default function RoomTransferBoard() {
     }
   };
 
+  const handleDelete = async () => {
+    if (!selected) return;
+    if (!confirm(`Hapus permanen data pindah ${selected.tenant.user.name} (${selected.fromRoom.roomNumber} -> ${selected.toRoom.roomNumber})?`)) {
+      return;
+    }
+    setSaving(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/room-transfers/${selected.id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Gagal menghapus data");
+        setSaving(false);
+        return;
+      }
+      setSelectedId(null);
+      await fetchAll();
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const selectedOldUtilities = roomUtilities.filter(
     (item) => item.roomId === selected?.fromRoomId && item.utility.billingMethod === "METER"
   );
@@ -317,7 +341,9 @@ export default function RoomTransferBoard() {
               value={createForm.toRoomId}
               onChange={(e) => setCreateForm((prev) => ({ ...prev, toRoomId: e.target.value }))}
             >
-              <option value="">Pilih kamar...</option>
+              <option value="">
+                {availableRooms.length === 0 ? "Tidak ada kamar kosong" : "Pilih kamar..."}
+              </option>
               {availableRooms.map((room) => (
                 <option key={room.id} value={room.id}>
                   {room.roomNumber} - Lantai {room.floor} - {formatCurrency(room.price)}
@@ -459,6 +485,11 @@ export default function RoomTransferBoard() {
                   {selected.status !== "COMPLETED" && selected.status !== "CANCELLED" && (
                     <Button variant="secondary" disabled={saving} onClick={() => runAction("cancel")}>
                       <X className="w-4 h-4" /> Batalkan
+                    </Button>
+                  )}
+                  {selected.status === "CANCELLED" && (
+                    <Button variant="danger" disabled={saving} onClick={handleDelete}>
+                      <Trash2 className="w-4 h-4" /> Hapus Data
                     </Button>
                   )}
                 </div>

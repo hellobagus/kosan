@@ -1,9 +1,11 @@
 import { Prisma, RoomTransferStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { getKosanProfile } from "@/lib/settings-service";
+import { generateTransferLetterNumber, resolveProjectFromRoom } from "@/lib/document-number";
+import { roomProjectFilter } from "@/lib/project-context";
 import { activateRoomAssetsForTenant, getTenantCheckoutAssets, inspectCheckoutAssets } from "@/lib/inventory-service";
 import { parseAmount } from "@/lib/tenant-utils";
 import { calcUtilityAmount, resolveRate } from "@/lib/utility-service";
+import { getProjectProfile } from "@/lib/settings-service";
 
 export const ROOM_TRANSFER_STATUS_LABELS: Record<RoomTransferStatus, string> = {
   REQUESTED: "Pengajuan Pindah",
@@ -126,23 +128,38 @@ async function ensureTargetRoomAvailable(tx: Prisma.TransactionClient, transfer:
     },
   });
   if (!targetRoom) throw new Error("Kamar tujuan tidak ditemukan");
-  if (targetRoom.id !== transfer.fromRoomId && targetRoom.tenants.length > 0) {
-    throw new Error("Kamar tujuan masih ditempati penghuni aktif");
-  }
-  if (targetRoom.status === "MAINTENANCE") {
-    throw new Error("Kamar tujuan sedang maintenance");
+  if (targetRoom.id !== transfer.fromRoomId) {
+    if (targetRoom.status !== "AVAILABLE") {
+      throw new Error("Kamar tujuan harus berstatus kosong (available)");
+    }
+    if (targetRoom.tenants.length > 0) {
+      throw new Error("Kamar tujuan masih ditempati penghuni aktif");
+    }
   }
 }
 
-function buildTransferLetterNumber(id: number) {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, "0");
-  return `SP-${y}${m}-${String(id).padStart(4, "0")}`;
+async function buildTransferLetterNumber(fromRoomId: number) {
+  const org = await resolveProjectFromRoom(fromRoomId);
+  if (!org) {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, "0");
+    return `SP-${y}${m}-0000`;
+  }
+  return generateTransferLetterNumber(org.entityId, org.projectId);
 }
 
-export async function listRoomTransfers() {
+export async function listRoomTransfers(projectId?: number) {
+  const where = projectId
+    ? {
+        OR: [
+          { fromRoom: roomProjectFilter(projectId) },
+          { toRoom: roomProjectFilter(projectId) },
+        ],
+      }
+    : {};
   return prisma.roomTransfer.findMany({
+    where,
     include: TRANSFER_INCLUDE,
     orderBy: [{ createdAt: "desc" }],
   });
@@ -173,8 +190,10 @@ export async function createRoomTransferRequest(input: {
     },
   });
   if (!targetRoom) throw new Error("Kamar tujuan tidak ditemukan");
+  if (targetRoom.status !== "AVAILABLE") {
+    throw new Error("Kamar tujuan harus berstatus kosong (available)");
+  }
   if (targetRoom.tenants.length > 0) throw new Error("Kamar tujuan masih ditempati penghuni aktif");
-  if (targetRoom.status === "MAINTENANCE") throw new Error("Kamar tujuan sedang maintenance");
 
   const openTransfer = await prisma.roomTransfer.findFirst({
     where: {
@@ -264,12 +283,14 @@ export async function generateRoomTransferLetter(id: number) {
   const transfer = await getTransferOrThrow(id);
   ensureStep(transfer.status, ["FINANCIAL_CALCULATED", "LETTER_GENERATED"]);
 
+  const letterNumber = transfer.letterNumber || await buildTransferLetterNumber(transfer.fromRoomId);
+
   return prisma.roomTransfer.update({
     where: { id },
     data: {
       status: "LETTER_GENERATED",
       letterGeneratedAt: new Date(),
-      letterNumber: transfer.letterNumber || buildTransferLetterNumber(id),
+      letterNumber,
     },
     include: TRANSFER_INCLUDE,
   });
@@ -597,6 +618,16 @@ export async function cancelRoomTransfer(id: number, notes?: string) {
   });
 }
 
+export async function deleteRoomTransfer(id: number) {
+  const transfer = await getTransferOrThrow(id);
+  if (transfer.status !== "CANCELLED") {
+    throw new Error("Hanya data pindah yang sudah dibatalkan yang dapat dihapus");
+  }
+
+  await prisma.roomTransfer.delete({ where: { id } });
+  return { ok: true as const };
+}
+
 function formatIdr(amount: number) {
   return `Rp ${Math.round(amount).toLocaleString("id-ID")}`;
 }
@@ -634,8 +665,9 @@ const TRANSFER_LETTER_STYLES = `
 
 export async function buildRoomTransferLetterHtml(id: number) {
   const transfer = await getTransferOrThrow(id);
-  const profile = await getKosanProfile();
-  const letterNo = transfer.letterNumber || buildTransferLetterNumber(transfer.id);
+  const org = await resolveProjectFromRoom(transfer.fromRoomId);
+  const profile = await getProjectProfile(org?.projectId);
+  const letterNo = transfer.letterNumber || await buildTransferLetterNumber(transfer.fromRoomId);
   const signDate = transfer.letterGeneratedAt || transfer.approvedAt || new Date();
   const rentDiff = parseAmount(transfer.rentDifference);
   const depositDiff = parseAmount(transfer.depositDifference);

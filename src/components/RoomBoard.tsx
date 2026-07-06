@@ -70,6 +70,10 @@ export default function RoomBoard() {
     fetch("/api/rooms")
       .then((res) => res.json())
       .then((data) => {
+        if (data.error) {
+          setRooms([]);
+          return;
+        }
         setRooms(data);
         if (data.length > 0) {
           setSelectedId((prev) => prev ?? data[0].id);
@@ -77,6 +81,12 @@ export default function RoomBoard() {
       })
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    const onContext = () => fetchRooms();
+    window.addEventListener("kosanku:context-changed", onContext);
+    return () => window.removeEventListener("kosanku:context-changed", onContext);
+  }, [fetchRooms]);
 
   useEffect(() => {
     fetchRooms();

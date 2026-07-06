@@ -1,13 +1,15 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
 import { getInventoryStats } from "@/lib/inventory-service";
+import { requireProjectContext } from "@/lib/project-context";
 
 export async function GET() {
   try {
-    const session = await getSession();
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireProjectContext();
+    if ("error" in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
 
-    const stats = await getInventoryStats();
+    const stats = await getInventoryStats(auth.context.projectId);
     return NextResponse.json(stats);
   } catch (error) {
     console.error("Inventory stats error:", error);

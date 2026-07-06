@@ -6,7 +6,6 @@ import { getSession } from "@/lib/auth";
 import {
   calcDueDate,
   calcTotalAmount,
-  generateInvoiceNumber,
   getLeaseBonusMonths,
   findLeasePackage,
   parseAdditionalFees,
@@ -16,6 +15,8 @@ import {
   type TenantPaymentType,
 } from "@/lib/tenant-utils";
 import { getKosanProfile } from "@/lib/settings-service";
+import { requireProjectContext, roomProjectFilter } from "@/lib/project-context";
+import { generateInvoiceNumber } from "@/lib/document-number";
 
 function parseStatusParam(value: string | null): TenantStatus | undefined {
   if (!value) return undefined;
@@ -25,16 +26,24 @@ function parseStatusParam(value: string | null): TenantStatus | undefined {
 
 export async function GET(request: NextRequest) {
   try {
+    const auth = await requireProjectContext();
+    if ("error" in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
+
     const { searchParams } = new URL(request.url);
     const status = parseStatusParam(searchParams.get("status"));
 
-    const where = status ? { status } : {};
+    const where: Record<string, unknown> = {
+      room: roomProjectFilter(auth.context.projectId),
+    };
+    if (status) where.status = status;
 
     const tenants = await prisma.tenant.findMany({
       where,
       include: {
         user: true,
-        room: true,
+        room: { include: { floorRef: true } },
       },
       orderBy: { checkIn: "desc" },
     });
@@ -72,10 +81,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Syarat & Ketentuan harus disetujui" }, { status: 400 });
     }
 
-    const room = await prisma.room.findUnique({ where: { id: parseInt(roomId) } });
+    const room = await prisma.room.findFirst({
+      where: { id: parseInt(roomId) },
+      include: { floorRef: { include: { building: true } } },
+    });
     if (!room) {
       return NextResponse.json({ error: "Kamar tidak ditemukan" }, { status: 400 });
     }
+
+    const auth = await requireProjectContext();
+    if ("error" in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
+    if (room.floorRef?.building.projectId !== auth.context.projectId) {
+      return NextResponse.json({ error: "Kamar tidak termasuk project aktif" }, { status: 400 });
+    }
+
+    const invoiceNo = await generateInvoiceNumber(auth.context.entityId, auth.context.projectId);
 
     const tenantStatus = status || (contractRequested ? "PENDING" : "ACTIVE");
     const preActiveStatuses = ["PENDING", "APPROVED", "CONTRACT_SENT", "CONTRACT_SIGNED", "RESERVED"];
@@ -218,7 +240,7 @@ export async function POST(request: NextRequest) {
           totalAmount: total,
           paidAmount: paid,
           paymentStatus: payStatus as "UNPAID" | "PARTIAL" | "PAID",
-          invoiceNumber: generateInvoiceNumber(Date.now() % 10000),
+          invoiceNumber: invoiceNo,
           lastPaymentDate: paid > 0 ? checkInDate : null,
           isDaily: isDaily || lease === "1 Hari",
         },
@@ -242,6 +264,7 @@ export async function POST(request: NextRequest) {
             transactionDate: checkInDate,
             tenantId: t.id,
             roomId: parseInt(roomId),
+            projectId: auth.context.projectId,
             createdBy: session.userId,
           },
         });
@@ -257,14 +280,14 @@ export async function POST(request: NextRequest) {
             transactionDate: checkInDate,
             tenantId: t.id,
             roomId: parseInt(roomId),
+            projectId: auth.context.projectId,
             createdBy: session.userId,
           },
         });
       }
 
-      return tx.tenant.update({
+      return tx.tenant.findUniqueOrThrow({
         where: { id: t.id },
-        data: { invoiceNumber: generateInvoiceNumber(t.id) },
         include: { user: true, room: true },
       });
     });

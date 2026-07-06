@@ -1,42 +1,38 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSession, isStaff } from "@/lib/auth";
-import { getKosanProfile, getBankAccounts } from "@/lib/settings-service";
+import { getProjectProfile, getBankAccounts } from "@/lib/settings-service";
 import { prisma } from "@/lib/prisma";
 import { parseLeasePackages } from "@/lib/tenant-utils";
+import { requireProjectContext } from "@/lib/project-context";
 
 export async function GET() {
-  const session = await getSession();
-  if (!session || !isStaff(session.role)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = await requireProjectContext();
+  if ("error" in auth) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
 
-  const [profile, banks] = await Promise.all([getKosanProfile(), getBankAccounts()]);
-  return NextResponse.json({ profile, banks });
+  const [profile, banks] = await Promise.all([
+    getProjectProfile(auth.context.projectId),
+    getBankAccounts(auth.context.entityId),
+  ]);
+  return NextResponse.json({ profile, banks, context: auth.context });
 }
 
 export async function PUT(request: NextRequest) {
-  const session = await getSession();
-  if (!session || !isStaff(session.role)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = await requireProjectContext();
+  if ("error" in auth) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
 
   const body = await request.json();
   const { section } = body;
+  const projectId = auth.context.projectId;
+  const entityId = auth.context.entityId;
 
   if (section === "profile") {
-    const profile = await prisma.kosanProfile.upsert({
-      where: { id: 1 },
-      update: {
+    const profile = await prisma.project.update({
+      where: { id: projectId },
+      data: {
         name: body.name,
-        address: body.address,
-        phone: body.phone,
-        email: body.email,
-        logoUrl: body.logoUrl,
-        managerName: body.managerName,
-        contractLocation: body.contractLocation,
-      },
-      create: {
-        name: body.name || "KosanKu",
         address: body.address,
         phone: body.phone,
         email: body.email,
@@ -52,26 +48,19 @@ export async function PUT(request: NextRequest) {
     const leasePackages = parseLeasePackages(body.leasePackages, {
       leaseBonusRules: body.leaseBonusRules,
     });
-    const profile = await prisma.kosanProfile.upsert({
-      where: { id: 1 },
-      update: {
+    const profile = await prisma.project.update({
+      where: { id: projectId },
+      data: {
         gracePeriodDays: parseInt(body.gracePeriodDays) || 3,
         latePenaltyPerDay: parseFloat(body.latePenaltyPerDay) || 50000,
         paymentNotes: body.paymentNotes,
         termsAndConditions: body.termsAndConditions ?? undefined,
         leasePackages: leasePackages as unknown as object,
       },
-      create: {
-        gracePeriodDays: parseInt(body.gracePeriodDays) || 3,
-        latePenaltyPerDay: parseFloat(body.latePenaltyPerDay) || 50000,
-        paymentNotes: body.paymentNotes,
-        termsAndConditions: body.termsAndConditions,
-        leasePackages: leasePackages as unknown as object,
-      },
     });
 
     if (Array.isArray(body.banks)) {
-      await prisma.bankAccount.deleteMany();
+      await prisma.bankAccount.deleteMany({ where: { entityId } });
       if (body.banks.length > 0) {
         await prisma.bankAccount.createMany({
           data: body.banks.map(
@@ -79,6 +68,7 @@ export async function PUT(request: NextRequest) {
               b: { bankName: string; accountNumber: string; accountHolder: string },
               i: number
             ) => ({
+              entityId,
               bankName: b.bankName,
               accountNumber: b.accountNumber,
               accountHolder: b.accountHolder,
@@ -89,18 +79,14 @@ export async function PUT(request: NextRequest) {
       }
     }
 
-    const banks = await getBankAccounts();
+    const banks = await getBankAccounts(entityId);
     return NextResponse.json({ profile, banks });
   }
 
   if (section === "contract_template") {
-    const profile = await prisma.kosanProfile.upsert({
-      where: { id: 1 },
-      update: {
-        contractTemplate: body.contractTemplate ?? null,
-        inventoryBaTemplate: body.inventoryBaTemplate ?? null,
-      },
-      create: {
+    const profile = await prisma.project.update({
+      where: { id: projectId },
+      data: {
         contractTemplate: body.contractTemplate ?? null,
         inventoryBaTemplate: body.inventoryBaTemplate ?? null,
       },
