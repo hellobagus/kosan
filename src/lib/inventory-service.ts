@@ -37,6 +37,45 @@ export const INSPECTION_RESULT_LABELS: Record<InspectionResult, string> = {
   MISSING: "Hilang",
 };
 
+export function buildInventoryTextLines(
+  selections: Array<{ name: string; quantity: number }>,
+  customText?: string
+): string {
+  const lines = selections
+    .filter((s) => s.quantity > 0)
+    .map((s) => (s.quantity > 1 ? `${s.name} x${s.quantity}` : s.name));
+  if (customText?.trim()) {
+    lines.push(
+      ...customText.split(/[\n,]/).map((s) => s.trim()).filter(Boolean)
+    );
+  }
+  return lines.join("\n");
+}
+
+export async function deployInventoryItemsToRoom(
+  roomId: number,
+  items: Array<{ itemId: number; quantity: number }>,
+  userId?: number
+) {
+  let deployed = 0;
+  let requested = 0;
+
+  for (const sel of items) {
+    requested += sel.quantity;
+    const assets = await prisma.roomAsset.findMany({
+      where: { itemId: sel.itemId, status: "IN_WAREHOUSE" },
+      take: sel.quantity,
+      orderBy: { id: "asc" },
+    });
+    for (const asset of assets) {
+      await deployAssetToRoom(asset.id, roomId, undefined, userId);
+      deployed += 1;
+    }
+  }
+
+  return { deployed, requested };
+}
+
 export function generatePurchaseNumber(): string {
   const now = new Date();
   const y = now.getFullYear().toString().slice(-2);

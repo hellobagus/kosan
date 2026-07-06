@@ -1,38 +1,68 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader, Card, CardBody, Input, Select, Textarea, Button } from "@/components/ui";
+import RoomInventoryFields, {
+  EMPTY_ROOM_INVENTORY,
+  getRoomInventoryTexts,
+  type RoomInventoryFormValue,
+  type InventoryItemOption,
+} from "@/components/RoomInventoryFields";
 
 export default function TambahKamarPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [inventoryItems, setInventoryItems] = useState<InventoryItemOption[]>([]);
+  const [inventory, setInventory] = useState<RoomInventoryFormValue>(EMPTY_ROOM_INVENTORY);
   const [form, setForm] = useState({
     roomNumber: "",
     floor: "1",
     price: "",
     dailyPrice: "",
-    facilities: "",
-    equipment: "",
     description: "",
   });
+
+  useEffect(() => {
+    fetch("/api/inventory/items?locationType=ROOM")
+      .then((r) => r.json())
+      .then(setInventoryItems)
+      .catch(() => {});
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError("");
 
+    const texts = getRoomInventoryTexts(inventory, inventoryItems);
+
     try {
       const res = await fetch("/api/rooms", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({
+          ...form,
+          templateId: inventory.templateId || undefined,
+          facilities: texts.facilities,
+          equipment: texts.equipment,
+          inventoryFacilities: inventory.facilityItems,
+          inventoryEquipment: inventory.equipmentItems,
+          customFacilities: inventory.customFacilities,
+          customEquipment: inventory.customEquipment,
+          autoDeploy: inventory.autoDeploy,
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
         setError(data.error);
         return;
+      }
+      if (data.deployResult && data.deployResult.deployed < data.deployResult.requested) {
+        alert(
+          `Kamar berhasil dibuat. ${data.deployResult.deployed} dari ${data.deployResult.requested} barang dideploy dari gudang. Sisanya perlu ditempatkan manual dari menu Gudang.`
+        );
       }
       router.push("/kamar");
       router.refresh();
@@ -47,10 +77,10 @@ export default function TambahKamarPage() {
     <div>
       <PageHeader
         title="Input Kamar Baru"
-        description="Tambahkan kamar baru ke dalam sistem"
+        description="Tambahkan kamar baru — fasilitas & kelengkapan terhubung ke inventaris"
       />
 
-      <Card className="max-w-2xl">
+      <Card className="max-w-3xl">
         <CardBody>
           <form onSubmit={handleSubmit} className="space-y-5">
             {error && (
@@ -94,20 +124,9 @@ export default function TambahKamarPage() {
               />
             </div>
 
-            <Textarea
-              label="Fasilitas Kamar"
-              rows={4}
-              placeholder={"Kasur 120x200\nAlmari\nMeja kursi\nKamar mandi dalam\nKipas angin"}
-              value={form.facilities}
-              onChange={(e) => setForm({ ...form, facilities: e.target.value })}
-            />
-
-            <Textarea
-              label="Kelengkapan Kamar Lainnya"
-              rows={2}
-              placeholder="Kunci kamar"
-              value={form.equipment}
-              onChange={(e) => setForm({ ...form, equipment: e.target.value })}
+            <RoomInventoryFields
+              value={inventory}
+              onChange={setInventory}
             />
 
             <Textarea

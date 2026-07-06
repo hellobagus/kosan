@@ -13,6 +13,12 @@ import {
 } from "lucide-react";
 import { Button, Card, CardBody, EmptyState, Input, Select, Textarea } from "@/components/ui";
 import { cn } from "@/lib/utils";
+import RoomInventoryFields, {
+  EMPTY_ROOM_INVENTORY,
+  getRoomInventoryTexts,
+  type RoomInventoryFormValue,
+  type InventoryItemOption,
+} from "@/components/RoomInventoryFields";
 
 interface Room {
   id: number;
@@ -25,6 +31,7 @@ interface Room {
   description: string | null;
   status: "AVAILABLE" | "OCCUPIED" | "MAINTENANCE";
   tenants: Array<{ user: { name: string } }>;
+  template?: { id: number; name: string } | null;
 }
 
 function parseList(text: string | null): string[] {
@@ -45,6 +52,8 @@ export default function RoomBoard() {
   const [floorFilter, setFloorFilter] = useState<number | "all">("all");
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [inventoryItems, setInventoryItems] = useState<InventoryItemOption[]>([]);
+  const [inventory, setInventory] = useState<RoomInventoryFormValue>(EMPTY_ROOM_INVENTORY);
   const [editForm, setEditForm] = useState({
     roomNumber: "",
     floor: "1",
@@ -71,6 +80,10 @@ export default function RoomBoard() {
 
   useEffect(() => {
     fetchRooms();
+    fetch("/api/inventory/items?locationType=ROOM")
+      .then((r) => r.json())
+      .then(setInventoryItems)
+      .catch(() => {});
   }, [fetchRooms]);
 
   const floors = useMemo(
@@ -103,7 +116,7 @@ export default function RoomBoard() {
     }
   }, [filteredRooms, selectedId]);
 
-  const openEdit = (room: Room) => {
+  const openEdit = async (room: Room) => {
     setEditForm({
       roomNumber: room.roomNumber,
       floor: String(room.floor),
@@ -114,17 +127,62 @@ export default function RoomBoard() {
       description: room.description || "",
       status: room.status,
     });
+
+    let inv: RoomInventoryFormValue = {
+      ...EMPTY_ROOM_INVENTORY,
+      templateId: room.template?.id ? String(room.template.id) : "",
+      customFacilities: room.facilities || "",
+      customEquipment: room.equipment || "",
+    };
+
+    if (room.template?.id) {
+      const templates = await fetch("/api/inventory/templates").then((r) => r.json());
+      const template = templates.find((t: { id: number }) => t.id === room.template?.id);
+      if (template) {
+        inv = {
+          ...inv,
+          facilityItems: template.items
+            .filter((i: { required: boolean }) => i.required)
+            .map((i: { itemId: number; quantity: number }) => ({ itemId: i.itemId, quantity: i.quantity })),
+          equipmentItems: template.items
+            .filter((i: { required: boolean }) => !i.required)
+            .map((i: { itemId: number; quantity: number }) => ({ itemId: i.itemId, quantity: i.quantity })),
+          customFacilities: "",
+          customEquipment: "",
+        };
+      }
+    }
+
+    setInventory(inv);
     setEditing(true);
   };
 
   const handleSave = async () => {
     if (!selected) return;
     setSaving(true);
-    await fetch("/api/rooms", {
+    const texts = getRoomInventoryTexts(inventory, inventoryItems);
+    const res = await fetch("/api/rooms", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: selected.id, ...editForm }),
+      body: JSON.stringify({
+        id: selected.id,
+        ...editForm,
+        facilities: texts.facilities,
+        equipment: texts.equipment,
+        templateId: inventory.templateId || null,
+        inventoryFacilities: inventory.facilityItems,
+        inventoryEquipment: inventory.equipmentItems,
+        customFacilities: inventory.customFacilities,
+        customEquipment: inventory.customEquipment,
+        autoDeploy: inventory.autoDeploy,
+      }),
     });
+    const data = await res.json();
+    if (data.deployResult && data.deployResult.deployed < data.deployResult.requested) {
+      alert(
+        `Kamar disimpan. ${data.deployResult.deployed} dari ${data.deployResult.requested} barang dideploy dari gudang.`
+      );
+    }
     setEditing(false);
     setSaving(false);
     fetchRooms();
@@ -359,7 +417,10 @@ export default function RoomBoard() {
             {/* Facilities grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-100">
               <div className="p-6">
-                <h3 className="font-bold text-slate-800 mb-4">Fasilitas Kamar</h3>
+                <h3 className="font-bold text-slate-800 mb-1">Fasilitas Kamar</h3>
+                {selected.template && (
+                  <p className="text-xs text-teal-700 mb-3">Template: {selected.template.name}</p>
+                )}
                 <ul className="space-y-2">
                   {parseList(selected.facilities).length > 0 ? (
                     parseList(selected.facilities).map((item, i) => (
@@ -407,7 +468,7 @@ export default function RoomBoard() {
       {/* Edit modal */}
       {editing && selected && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between px-6 py-4 border-b">
               <h2 className="font-bold text-lg">Edit Kamar {selected.roomNumber}</h2>
               <button onClick={() => setEditing(false)} className="text-slate-400 hover:text-slate-600">
@@ -432,18 +493,13 @@ export default function RoomBoard() {
                 <option value="OCCUPIED">Terisi</option>
                 <option value="MAINTENANCE">Perbaikan</option>
               </Select>
-              <Textarea
-                label="Fasilitas Kamar (pisahkan dengan koma atau baris baru)"
-                rows={3}
-                value={editForm.facilities}
-                onChange={(e) => setEditForm({ ...editForm, facilities: e.target.value })}
+
+              <RoomInventoryFields
+                value={inventory}
+                onChange={setInventory}
+                roomId={selected.id}
               />
-              <Textarea
-                label="Kelengkapan Lainnya"
-                rows={2}
-                value={editForm.equipment}
-                onChange={(e) => setEditForm({ ...editForm, equipment: e.target.value })}
-              />
+
               <Textarea
                 label="Catatan Kamar"
                 rows={2}
