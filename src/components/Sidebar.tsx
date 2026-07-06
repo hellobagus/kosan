@@ -38,6 +38,7 @@ const navigation = [
     icon: Users,
     children: [
       { name: "Penghuni Aktif", href: "/penghuni/aktif" },
+      { name: "Pindah Unit / Kamar", href: "/penghuni/pindah" },
       { name: "Calon Penghuni", href: "/penghuni/calon" },
       { name: "Reservasi", href: "/penghuni/reservasi" },
       { name: "Input Penghuni Baru", href: "/penghuni/baru" },

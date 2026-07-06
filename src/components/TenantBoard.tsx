@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   User, Calendar, Plus, Search, X, FileText, MessageCircle, Printer,
   LogOut, RefreshCw, DollarSign, Pencil, Trash2, ChevronLeft, ChevronRight, Wallet,
+  ArrowRightLeft,
 } from "lucide-react";
 import { PaymentModal } from "@/components/PaymentModal";
 import { Button, Card, CardBody, EmptyState, Input, Select } from "@/components/ui";
@@ -572,6 +573,12 @@ export default function TenantBoard({ defaultTab = "ACTIVE" }: { defaultTab?: Ta
                                   className="px-2 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded hover:bg-blue-700">
                                   Perpanjang
                                 </button>
+                                <Link
+                                  href={`/penghuni/pindah?tenantId=${t.id}`}
+                                  className="flex items-center justify-center gap-1 px-2 py-1.5 bg-violet-600 text-white text-xs font-semibold rounded hover:bg-violet-700"
+                                >
+                                  <ArrowRightLeft className="w-3 h-3" /> Pindah
+                                </Link>
                               </>
                             )}
                             <button onClick={() => openModal(t, "payment")}

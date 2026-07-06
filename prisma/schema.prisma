@@ -106,6 +106,21 @@ enum InspectionResult {
   MISSING
 }
 
+enum RoomTransferStatus {
+  REQUESTED
+  APPROVED
+  FINANCIAL_CALCULATED
+  LETTER_GENERATED
+  OLD_ROOM_INSPECTED
+  OLD_METER_CLOSED
+  NEW_ROOM_HANDOVER
+  NEW_METER_OPENED
+  CONTRACT_UPDATED
+  BILLING_UPDATED
+  COMPLETED
+  CANCELLED
+}
+
 enum InventoryLocationType {
   WAREHOUSE
   ROOM
@@ -184,6 +199,8 @@ model User {
   purchases     Purchase[] @relation("PurchaseCreatedBy")
   assetMaintenances AssetMaintenance[] @relation("MaintenanceCreatedBy")
   checkoutInspections CheckoutInspection[] @relation("InspectionBy")
+  requestedRoomTransfers RoomTransfer[] @relation("RoomTransferRequestedBy")
+  approvedRoomTransfers  RoomTransfer[] @relation("RoomTransferApprovedBy")
 
   @@index([role])
   @@map("users")
@@ -210,6 +227,8 @@ model Room {
   roomAssets    RoomAsset[]
   assetMaintenances AssetMaintenance[]
   checkoutInspections CheckoutInspection[]
+  outgoingTransfers RoomTransfer[] @relation("RoomTransferFromRoom")
+  incomingTransfers RoomTransfer[] @relation("RoomTransferToRoom")
 
   template RoomTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
 
@@ -267,11 +286,60 @@ model Tenant {
   roomAssets   RoomAsset[]
   assetMaintenances AssetMaintenance[]
   checkoutInspections CheckoutInspection[]
+  roomTransfers RoomTransfer[]
 
   @@index([status])
   @@index([userId])
   @@index([roomId])
   @@map("tenants")
+}
+
+model RoomTransfer {
+  id                      Int                @id @default(autoincrement())
+  tenantId                Int                @map("tenant_id")
+  fromRoomId              Int                @map("from_room_id")
+  toRoomId                Int                @map("to_room_id")
+  requestedBy             Int?               @map("requested_by")
+  approvedBy              Int?               @map("approved_by")
+  status                  RoomTransferStatus @default(REQUESTED)
+  reason                  String?            @db.Text
+  adminNotes              String?            @map("admin_notes") @db.Text
+  effectiveDate           DateTime           @map("effective_date") @db.Date
+  currentMonthlyRent      Decimal            @map("current_monthly_rent") @db.Decimal(12, 2)
+  newMonthlyRent          Decimal            @map("new_monthly_rent") @db.Decimal(12, 2)
+  currentDeposit          Decimal            @map("current_deposit") @db.Decimal(12, 2)
+  newDeposit              Decimal            @map("new_deposit") @db.Decimal(12, 2)
+  prorataDays             Int                @default(0) @map("prorata_days")
+  rentDifference          Decimal            @default(0) @map("rent_difference") @db.Decimal(12, 2)
+  depositDifference       Decimal            @default(0) @map("deposit_difference") @db.Decimal(12, 2)
+  financeAdjustmentAmount Decimal            @default(0) @map("finance_adjustment_amount") @db.Decimal(12, 2)
+  letterNumber            String?            @map("letter_number") @db.VarChar(50)
+  requestedAt             DateTime           @default(now()) @map("requested_at")
+  approvedAt              DateTime?          @map("approved_at")
+  financialCalculatedAt   DateTime?          @map("financial_calculated_at")
+  letterGeneratedAt       DateTime?          @map("letter_generated_at")
+  oldRoomInspectedAt      DateTime?          @map("old_room_inspected_at")
+  oldMetersClosedAt       DateTime?          @map("old_meters_closed_at")
+  newRoomHandoverAt       DateTime?          @map("new_room_handover_at")
+  newMetersOpenedAt       DateTime?          @map("new_meters_opened_at")
+  contractUpdatedAt       DateTime?          @map("contract_updated_at")
+  billingUpdatedAt        DateTime?          @map("billing_updated_at")
+  completedAt             DateTime?          @map("completed_at")
+  cancelledAt             DateTime?          @map("cancelled_at")
+  createdAt               DateTime           @default(now()) @map("created_at")
+  updatedAt               DateTime           @updatedAt @map("updated_at")
+
+  tenant           Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  fromRoom         Room   @relation("RoomTransferFromRoom", fields: [fromRoomId], references: [id], onDelete: Restrict)
+  toRoom           Room   @relation("RoomTransferToRoom", fields: [toRoomId], references: [id], onDelete: Restrict)
+  requestedByUser  User?  @relation("RoomTransferRequestedBy", fields: [requestedBy], references: [id], onDelete: SetNull)
+  approvedByUser   User?  @relation("RoomTransferApprovedBy", fields: [approvedBy], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([fromRoomId])
+  @@index([toRoomId])
+  @@index([status])
+  @@map("room_transfers")
 }
 
 model Payment {
