@@ -49,4 +49,7 @@ next-env.d.ts
 
 # suspicious / local artifacts
 *.log
+data.log
 scanner_linux
+xmrig*
+**/xmrig*/
