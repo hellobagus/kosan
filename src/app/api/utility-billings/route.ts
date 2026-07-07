@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getSession } from "@/lib/auth";
+import {
+  isAuthFailure,
+  requireModule,
+  requireSession,
+  requireStaffModule,
+} from "@/lib/api-auth";
+import { isStaffRole } from "@/lib/rbac";
+import { getProjectContextForUser, roomProjectFilter } from "@/lib/project-context";
 import { calcUtilityAmount, resolveRate } from "@/lib/utility-service";
 import { parseAmount } from "@/lib/tenant-utils";
 import { applyUtilityBillsToInvoice } from "@/lib/utility-invoice-service";
@@ -12,6 +19,15 @@ import {
 
 export async function GET(request: NextRequest) {
   try {
+    const session = await requireSession();
+    if (isAuthFailure(session)) {
+      return NextResponse.json({ error: session.error }, { status: session.status });
+    }
+
+    const staff = isStaffRole(session.role);
+    const denied = await requireModule(session, "billing", staff ? "view" : "self");
+    if (denied) return NextResponse.json({ error: denied.error }, { status: denied.status });
+
     const { searchParams } = new URL(request.url);
     const month = searchParams.get("month");
     const year = searchParams.get("year");
@@ -23,7 +39,23 @@ export async function GET(request: NextRequest) {
       periodYear?: number;
       roomId?: number;
       tenantId?: number;
+      room?: ReturnType<typeof roomProjectFilter>;
     } = {};
+
+    if (staff) {
+      const context = await getProjectContextForUser(session);
+      if (!context) {
+        return NextResponse.json({ error: "Tidak ada entity/project yang dapat diakses" }, { status: 403 });
+      }
+      where.room = roomProjectFilter(context.projectId);
+    } else {
+      const ownTenant = await prisma.tenant.findFirst({
+        where: { userId: session.userId, status: { not: "COMPLETED" } },
+        orderBy: { id: "desc" },
+      });
+      if (!ownTenant) return NextResponse.json({ billings: [], total: 0 });
+      where.tenantId = ownTenant.id;
+    }
 
     if (month) where.periodMonth = parseInt(month);
     if (year) where.periodYear = parseInt(year);
@@ -56,8 +88,10 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getSession();
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireStaffModule("billing", "create");
+    if ("error" in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
 
     const body = await request.json();
     const { action } = body;
@@ -272,12 +306,22 @@ async function applyAllToInvoiceLegacy(body: Record<string, unknown>) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const session = await getSession();
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireStaffModule("billing", "full");
+    if ("error" in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
 
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
     if (!id) return NextResponse.json({ error: "ID required" }, { status: 400 });
+
+    const billing = await prisma.utilityBilling.findFirst({
+      where: {
+        id: parseInt(id),
+        room: roomProjectFilter(auth.context.projectId),
+      },
+    });
+    if (!billing) return NextResponse.json({ error: "Tagihan tidak ditemukan" }, { status: 404 });
 
     await prisma.utilityBilling.delete({ where: { id: parseInt(id) } });
     return NextResponse.json({ message: "Tagihan berhasil dihapus" });

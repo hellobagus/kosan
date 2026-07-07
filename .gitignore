@@ -44,6 +44,8 @@ next-env.d.ts
 # uploaded contract scans
 /public/uploads/contracts/*
 !/public/uploads/contracts/.gitkeep
+/public/uploads/repairs/*
+!/public/uploads/repairs/.gitkeep
 
 # suspicious / local artifacts
 *.log

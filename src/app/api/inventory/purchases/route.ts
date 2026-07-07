@@ -72,6 +72,8 @@ export async function POST(request: NextRequest) {
         status: "ORDERED",
         notes: notes || null,
         createdBy: auth.session.userId,
+        createdByName: auth.session.name,
+        updatedByName: auth.session.name,
         items: { create: purchaseItems },
       },
       include: {
@@ -123,7 +125,7 @@ export async function PUT(request: NextRequest) {
     if (action === "cancel") {
       const purchase = await prisma.purchase.update({
         where: { id: parseInt(id) },
-        data: { status: "CANCELLED" },
+        data: { status: "CANCELLED", updatedByName: auth.session.name },
         include: { supplier: true, items: { include: { item: true } } },
       });
       return NextResponse.json(purchase);

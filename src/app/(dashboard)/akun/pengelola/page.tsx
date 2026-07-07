@@ -3,10 +3,26 @@ import AccountListPage from "@/components/AccountList";
 export default function AkunPengelolaPage() {
   return (
     <AccountListPage
-      title="Akun Pengelola / Pemilik"
-      description="Kelola akun pengelola dan pemilik kosan"
-      rolesToShow={["OWNER", "MANAGER"]}
-      allowedRoles={["OWNER", "MANAGER"]}
+      title="Akun Staff"
+      description="Kelola akun staff berdasarkan jabatan dan tanggung jawabnya"
+      rolesToShow={[
+        "SUPER_ADMIN",
+        "ENTITY_MANAGER",
+        "PROJECT_MANAGER",
+        "FRONT_OFFICE",
+        "FINANCE",
+        "MAINTENANCE",
+        "OWNER",
+        "MANAGER",
+      ]}
+      allowedRoles={[
+        "SUPER_ADMIN",
+        "ENTITY_MANAGER",
+        "PROJECT_MANAGER",
+        "FRONT_OFFICE",
+        "FINANCE",
+        "MAINTENANCE",
+      ]}
     />
   );
 }

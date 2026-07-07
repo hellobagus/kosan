@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { getInventoryStats } from "@/lib/inventory-service";
-import { requireProjectContext } from "@/lib/project-context";
+import { requireStaffModule } from "@/lib/api-auth";
 
 export async function GET() {
   try {
-    const auth = await requireProjectContext();
+    const auth = await requireStaffModule("inventory", "view");
     if ("error" in auth) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }

@@ -9,6 +9,7 @@ import bcrypt from "bcryptjs";
 import { calcDueDate, calcTotalAmount } from "../src/lib/tenant-utils";
 import { generateInvoiceNumber } from "../src/lib/document-number";
 import { ensureDefaultOrganization } from "../src/lib/organization-service";
+import { ROLE_OPTIONS } from "../src/lib/rbac";
 
 const prisma = new PrismaClient();
 
@@ -142,7 +143,9 @@ async function seedOneProject(entityId: number, adminId: number, cfg: ProjectSee
     });
   }
 
-  const staff = await prisma.user.findMany({ where: { role: { in: ["OWNER", "MANAGER"] } } });
+  const staff = await prisma.user.findMany({
+    where: { role: { in: ROLE_OPTIONS.filter((role) => role !== "TENANT") } },
+  });
   for (const user of staff) {
     await prisma.userProjectAccess.upsert({
       where: { userId_projectId: { userId: user.id, projectId: project.id } },

@@ -10,23 +10,5 @@ function createPrismaClient() {
   });
 }
 
-function getPrismaClient(): PrismaClient {
-  const cached = globalForPrisma.prisma;
-  // Recreate stale client after schema changes (e.g. new Payment model)
-  if (cached && "payment" in cached) {
-    return cached;
-  }
-  const client = createPrismaClient();
-  if (process.env.NODE_ENV !== "production") {
-    globalForPrisma.prisma = client;
-  }
-  return client;
-}
-
-export const prisma = new Proxy({} as PrismaClient, {
-  get(_target, prop, receiver) {
-    const client = getPrismaClient();
-    const value = Reflect.get(client, prop, receiver);
-    return typeof value === "function" ? value.bind(client) : value;
-  },
-});
+export const prisma = globalForPrisma.prisma ?? createPrismaClient();
+globalForPrisma.prisma = prisma;

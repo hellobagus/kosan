@@ -2,6 +2,8 @@ import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { calcDueDate, calcTotalAmount } from "../src/lib/tenant-utils";
 import { ensureDefaultOrganization } from "../src/lib/organization-service";
+import { ensureRbacSeeded, syncTenantPortalPermissions } from "../src/lib/permission-service";
+import { DEMO_ACCOUNTS } from "../src/lib/demo-accounts";
 
 const prisma = new PrismaClient();
 
@@ -23,10 +25,27 @@ async function main() {
 
   const adminPassword = await bcrypt.hash("admin123", 10);
   const managerPassword = await bcrypt.hash("manager123", 10);
+  const staffPassword = await bcrypt.hash("staff123", 10);
+  const tenantPassword = await bcrypt.hash("penghuni123", 10);
+
+  const staffSeeds = [
+    { email: "superadmin@kosanku.com", name: "Sinta Super Admin", role: "SUPER_ADMIN" as const, phone: "081234567800" },
+    { email: "entity.manager@kosanku.com", name: "Eka Entity Manager", role: "ENTITY_MANAGER" as const, phone: "081234567801" },
+    { email: "project.manager@kosanku.com", name: "Pandu Project Manager", role: "PROJECT_MANAGER" as const, phone: "081234567802" },
+    { email: "frontoffice@kosanku.com", name: "Fira Front Office", role: "FRONT_OFFICE" as const, phone: "081282771292" },
+    { email: "finance@kosanku.com", name: "Fani Finance", role: "FINANCE" as const, phone: "081234567804" },
+    { email: "maintenance@kosanku.com", name: "Maman Maintenance", role: "MAINTENANCE" as const, phone: "081282771292" },
+  ];
 
   const admin = await prisma.user.upsert({
     where: { email: "admin@kosanku.com" },
-    update: {},
+    update: {
+      name: "Admin Pemilik",
+      password: adminPassword,
+      role: "OWNER",
+      phone: "081234567890",
+      isActive: true,
+    },
     create: {
       name: "Admin Pemilik",
       email: "admin@kosanku.com",
@@ -39,7 +58,13 @@ async function main() {
 
   await prisma.user.upsert({
     where: { email: "manager@kosanku.com" },
-    update: {},
+    update: {
+      name: "Budi Pengelola",
+      password: managerPassword,
+      role: "MANAGER",
+      phone: "081234567891",
+      isActive: true,
+    },
     create: {
       name: "Budi Pengelola",
       email: "manager@kosanku.com",
@@ -49,7 +74,25 @@ async function main() {
     },
   });
 
-  const tenantPassword = await bcrypt.hash("penghuni123", 10);
+  for (const staff of staffSeeds) {
+    await prisma.user.upsert({
+      where: { email: staff.email },
+      update: {
+        name: staff.name,
+        password: staffPassword,
+        role: staff.role,
+        phone: staff.phone,
+        isActive: true,
+      },
+      create: {
+        name: staff.name,
+        email: staff.email,
+        password: staffPassword,
+        phone: staff.phone,
+        role: staff.role,
+      },
+    });
+  }
 
   async function upsertRoom(data: {
     roomNumber: string;
@@ -116,6 +159,99 @@ async function main() {
   const room123 = rooms.find((r) => r.roomNumber === "123")!;
   const roomA1 = rooms.find((r) => r.roomNumber === "A1")!;
   const room01 = rooms.find((r) => r.roomNumber === "01")!;
+
+  const roomB01 = rooms.find((r) => r.roomNumber === "B01")!;
+
+  const bagus = await prisma.user.upsert({
+    where: { email: "bagus.trinanda@ifca.co.id" },
+    update: {
+      name: "Bagus Trinanda",
+      password: tenantPassword,
+      role: "TENANT",
+      phone: "081234567899",
+      gender: "MALE",
+      ktp: "3174012345670001",
+      maritalStatus: "SINGLE",
+      occupation: "Software Engineer",
+      isActive: true,
+    },
+    create: {
+      name: "Bagus Trinanda",
+      email: "bagus.trinanda@ifca.co.id",
+      password: tenantPassword,
+      phone: "081234567899",
+      role: "TENANT",
+      gender: "MALE",
+      ktp: "3174012345670001",
+      maritalStatus: "SINGLE",
+      occupation: "Software Engineer",
+      address: "Jakarta",
+    },
+  });
+
+  const checkInBagus = new Date("2026-07-01");
+  const dueBagus = calcDueDate(checkInBagus, "1 Bulan");
+  const totalBagus = calcTotalAmount({
+    monthlyRent: 1100000,
+    leaseDuration: "1 Bulan",
+    occupantCount: 1,
+    discount: 0,
+    deposit: 1100000,
+    additionalFees: [],
+    checkIn: checkInBagus,
+    dueDate: dueBagus,
+  });
+
+  const existingBagusTenant = await prisma.tenant.findFirst({
+    where: { userId: bagus.id },
+    orderBy: { id: "desc" },
+  });
+
+  const bagusTenant = existingBagusTenant
+    ? await prisma.tenant.update({
+        where: { id: existingBagusTenant.id },
+        data: {
+          roomId: roomB01.id,
+          checkIn: checkInBagus,
+          dueDate: dueBagus,
+          monthlyRent: 1100000,
+          deposit: 1100000,
+          status: "ACTIVE",
+          leaseDuration: "1 Bulan",
+          occupantCount: 1,
+          totalAmount: totalBagus,
+          paidAmount: totalBagus,
+          paymentStatus: "PAID",
+          invoiceNumber: "#26070001",
+          lastPaymentDate: checkInBagus,
+          updatedByName: admin.name,
+        },
+      })
+    : await prisma.tenant.create({
+        data: {
+          userId: bagus.id,
+          roomId: roomB01.id,
+          checkIn: checkInBagus,
+          dueDate: dueBagus,
+          monthlyRent: 1100000,
+          deposit: 1100000,
+          status: "ACTIVE",
+          leaseDuration: "1 Bulan",
+          occupantCount: 1,
+          totalAmount: totalBagus,
+          paidAmount: totalBagus,
+          paymentStatus: "PAID",
+          invoiceNumber: "#26070001",
+          lastPaymentDate: checkInBagus,
+          createdByName: admin.name,
+          updatedByName: admin.name,
+        },
+      });
+
+  await prisma.room.update({
+    where: { id: roomB01.id },
+    data: { status: "OCCUPIED" },
+  });
 
   const adriana = await prisma.user.upsert({
     where: { email: "adriana@email.com" },
@@ -272,6 +408,11 @@ async function main() {
         transactionDate: checkInMirna, tenantId: 2, roomId: roomA1.id, createdBy: admin.id,
       },
       {
+        type: "INCOME", amount: totalBagus,
+        description: "Sewa - Bagus Trinanda (Kamar B01)", category: "Sewa",
+        transactionDate: checkInBagus, tenantId: bagusTenant.id, roomId: roomB01.id, createdBy: admin.id,
+      },
+      {
         type: "INCOME", amount: totalLala,
         description: "Sewa - Lala (Kamar 01)", category: "Sewa",
         transactionDate: new Date("2026-06-14"), tenantId: 4, roomId: room01.id, createdBy: admin.id,
@@ -426,8 +567,71 @@ async function main() {
   await ensureDefaultOrganization();
   console.log("Organisasi default (Holding/Entity/Project/Gedung/Lantai) siap.");
 
+  await grantStaffOrganizationAccess();
+  await ensureRbacSeeded();
+  await syncTenantPortalPermissions();
+
+  const project = await prisma.project.findFirst({ where: { active: true }, orderBy: { id: "asc" } });
+  if (project) {
+    const existingAnnouncement = await prisma.announcement.findFirst({
+      where: { projectId: project.id, title: "Selamat datang di Portal Penghuni" },
+    });
+    if (!existingAnnouncement) {
+      await prisma.announcement.createMany({
+        data: [
+          {
+            projectId: project.id,
+            title: "Selamat datang di Portal Penghuni",
+            content: "Gunakan menu Tagihan untuk melihat invoice dan jadwal pembayaran. Pengajuan pindah kamar dapat dilakukan melalui menu Permohonan Pindah.",
+            audience: "TENANT",
+            createdByName: "Admin Pemilik",
+          },
+          {
+            projectId: project.id,
+            title: "Pengingat Pembayaran Sewa",
+            content: "Mohon lakukan pembayaran sewa sebelum tanggal jatuh tempo. Hubungi bagian finance jika memerlukan rincian tagihan.",
+            audience: "TENANT",
+            createdByName: "Finance",
+          },
+        ],
+      });
+    }
+  }
+
+  console.log("Menu & hak akses RBAC siap.");
+
+  console.log("\n=== Akun Login Demo (sesuai role & permission) ===");
+  for (const account of DEMO_ACCOUNTS) {
+    console.log(`${account.role.padEnd(24)} ${account.email.padEnd(32)} / ${account.password}`);
+  }
+  console.log("\nPenghuni lain (password: penghuni123): adriana@email.com, mirna@email.com");
   console.log("Seed completed!");
-  console.log("Admin: admin@kosanku.com / admin123");
+}
+
+async function grantStaffOrganizationAccess() {
+  const project = await prisma.project.findFirst({
+    where: { active: true },
+    include: { entity: true },
+    orderBy: { id: "asc" },
+  });
+  if (!project) return;
+
+  const staff = await prisma.user.findMany({
+    where: { role: { not: "TENANT" }, isActive: true },
+  });
+
+  for (const user of staff) {
+    await prisma.userEntityAccess.upsert({
+      where: { userId_entityId: { userId: user.id, entityId: project.entityId } },
+      create: { userId: user.id, entityId: project.entityId },
+      update: {},
+    });
+    await prisma.userProjectAccess.upsert({
+      where: { userId_projectId: { userId: user.id, projectId: project.id } },
+      create: { userId: user.id, projectId: project.id },
+      update: {},
+    });
+  }
 }
 
 main()

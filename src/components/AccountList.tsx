@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Plus } from "lucide-react";
 import {
   PageHeader, Card, CardBody, Table, Th, Td, Badge, EmptyState,
   Input, Select, Button,
 } from "@/components/ui";
 import { formatShortDate } from "@/lib/utils";
+import { getRoleLabel } from "@/lib/rbac";
 
 interface User {
   id: number;
@@ -18,12 +19,6 @@ interface User {
   createdAt: string;
   tenants?: Array<{ room: { roomNumber: string } }>;
 }
-
-const roleLabels: Record<string, string> = {
-  OWNER: "Pemilik",
-  MANAGER: "Pengelola",
-  TENANT: "Penghuni",
-};
 
 export default function AccountListPage({
   title,
@@ -52,7 +47,7 @@ export default function AccountListPage({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
-  const fetchUsers = () => {
+  const fetchUsers = useCallback(() => {
     const url = roleFilter ? `/api/users?role=${roleFilter}` : "/api/users";
     fetch(url)
       .then((res) => res.json())
@@ -64,9 +59,9 @@ export default function AccountListPage({
         }
       })
       .finally(() => setLoading(false));
-  };
+  }, [roleFilter, rolesToShow]);
 
-  useEffect(() => { fetchUsers(); }, [roleFilter]);
+  useEffect(() => { fetchUsers(); }, [fetchUsers]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -130,7 +125,7 @@ export default function AccountListPage({
                 <Input label="Telepon" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
                 <Select label="Role" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
                   {allowedRoles.map((r) => (
-                    <option key={r} value={r}>{roleLabels[r]}</option>
+                    <option key={r} value={r}>{getRoleLabel(r)}</option>
                   ))}
                 </Select>
               </div>
@@ -167,7 +162,7 @@ export default function AccountListPage({
                     <Td><span className="font-semibold">{u.name}</span></Td>
                     <Td>{u.email}</Td>
                     <Td>{u.phone || "-"}</Td>
-                    <Td><Badge variant="info">{roleLabels[u.role]}</Badge></Td>
+                    <Td><Badge variant="info">{getRoleLabel(u.role)}</Badge></Td>
                     {roleFilter === "TENANT" && (
                       <Td>{u.tenants?.[0]?.room.roomNumber || "-"}</Td>
                     )}

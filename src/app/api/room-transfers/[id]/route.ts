@@ -14,6 +14,7 @@ import {
   updateTransferBilling,
   updateTransferContract,
 } from "@/lib/room-transfer-service";
+import { hasModuleAccess } from "@/lib/rbac";
 
 export async function PUT(
   request: NextRequest,
@@ -22,6 +23,9 @@ export async function PUT(
   try {
     const session = await getSession();
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!hasModuleAccess(session.role, "tenant", "full")) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
 
     const { id } = await params;
     const transferId = parseInt(id, 10);
@@ -92,6 +96,9 @@ export async function DELETE(
   try {
     const session = await getSession();
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!hasModuleAccess(session.role, "tenant", "full")) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
 
     const { id } = await params;
     const result = await deleteRoomTransfer(parseInt(id, 10));

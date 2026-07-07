@@ -8,6 +8,12 @@ datasource db {
 }
 
 enum UserRole {
+  SUPER_ADMIN
+  ENTITY_MANAGER
+  PROJECT_MANAGER
+  FRONT_OFFICE
+  FINANCE
+  MAINTENANCE
   OWNER
   MANAGER
   TENANT
@@ -95,6 +101,23 @@ enum PurchaseStatus {
 
 enum MaintenanceStatus {
   OPEN
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum RepairCategory {
+  PLUMBING
+  AC
+  ELECTRICAL
+  FURNITURE
+  STRUCTURAL
+  OTHER
+}
+
+enum RepairRequestStatus {
+  REQUESTED
+  INSPECTING
   IN_PROGRESS
   COMPLETED
   CANCELLED
@@ -211,6 +234,8 @@ model Project {
   finances            Finance[]
   userAccess          UserProjectAccess[]
   documentSequences   DocumentSequence[]
+  announcements       Announcement[]
+  repairRequests      TenantRepairRequest[]
 
   @@unique([entityId, code])
   @@index([entityId])
@@ -368,6 +393,7 @@ model User {
   checkoutInspections CheckoutInspection[] @relation("InspectionBy")
   requestedRoomTransfers RoomTransfer[] @relation("RoomTransferRequestedBy")
   approvedRoomTransfers  RoomTransfer[] @relation("RoomTransferApprovedBy")
+  inspectedRepairRequests TenantRepairRequest[] @relation("RepairInspectedBy")
   entityAccess           UserEntityAccess[]
   projectAccess          UserProjectAccess[]
 
@@ -399,6 +425,7 @@ model Room {
   checkoutInspections CheckoutInspection[]
   outgoingTransfers RoomTransfer[] @relation("RoomTransferFromRoom")
   incomingTransfers RoomTransfer[] @relation("RoomTransferToRoom")
+  repairRequests    TenantRepairRequest[]
 
   floorRef Floor?        @relation(fields: [floorId], references: [id], onDelete: Restrict)
   template RoomTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
@@ -440,6 +467,7 @@ model Tenant {
   contractRequested    Boolean       @default(false) @map("contract_requested")
   approvedAt           DateTime?     @map("approved_at")
   approvedBy           Int?          @map("approved_by")
+  approvedByName       String?       @map("approved_by_name") @db.VarChar(100)
   contractSentAt       DateTime?     @map("contract_sent_at")
   contractSignedAt     DateTime?     @map("contract_signed_at")
   contractSignedUrl    String?       @map("contract_signed_url")
@@ -448,6 +476,8 @@ model Tenant {
   depositRefundedAt    DateTime?     @map("deposit_refunded_at")
   checkoutInspectionAt DateTime?     @map("checkout_inspection_at")
   notes                String?
+  createdByName        String?       @map("created_by_name") @db.VarChar(100)
+  updatedByName        String?       @map("updated_by_name") @db.VarChar(100)
   createdAt            DateTime      @default(now()) @map("created_at")
   updatedAt       DateTime      @updatedAt @map("updated_at")
 
@@ -460,6 +490,7 @@ model Tenant {
   assetMaintenances AssetMaintenance[]
   checkoutInspections CheckoutInspection[]
   roomTransfers RoomTransfer[]
+  repairRequests TenantRepairRequest[]
 
   @@index([status])
   @@index([userId])
@@ -489,6 +520,7 @@ model RoomTransfer {
   letterNumber            String?            @map("letter_number") @db.VarChar(50)
   requestedAt             DateTime           @default(now()) @map("requested_at")
   approvedAt              DateTime?          @map("approved_at")
+  approvedByName          String?            @map("approved_by_name") @db.VarChar(100)
   financialCalculatedAt   DateTime?          @map("financial_calculated_at")
   letterGeneratedAt       DateTime?          @map("letter_generated_at")
   oldRoomInspectedAt      DateTime?          @map("old_room_inspected_at")
@@ -499,6 +531,8 @@ model RoomTransfer {
   billingUpdatedAt        DateTime?          @map("billing_updated_at")
   completedAt             DateTime?          @map("completed_at")
   cancelledAt             DateTime?          @map("cancelled_at")
+  createdByName           String?            @map("created_by_name") @db.VarChar(100)
+  updatedByName           String?            @map("updated_by_name") @db.VarChar(100)
   createdAt               DateTime           @default(now()) @map("created_at")
   updatedAt               DateTime           @updatedAt @map("updated_at")
 
@@ -524,6 +558,10 @@ model Payment {
   orderId       String              @unique @map("order_id") @db.VarChar(60)
   transactionId String?             @map("transaction_id") @db.VarChar(100)
   notes         String?
+  approvedByName String?            @map("approved_by_name") @db.VarChar(100)
+  approvedAt    DateTime?           @map("approved_at")
+  createdByName String?             @map("created_by_name") @db.VarChar(100)
+  updatedByName String?             @map("updated_by_name") @db.VarChar(100)
   createdAt     DateTime            @default(now()) @map("created_at")
   updatedAt     DateTime            @updatedAt @map("updated_at")
 
@@ -545,6 +583,10 @@ model Finance {
   tenantId        Int?            @map("tenant_id")
   roomId          Int?            @map("room_id")
   createdBy       Int?            @map("created_by")
+  createdByName   String?         @map("created_by_name") @db.VarChar(100)
+  updatedByName   String?         @map("updated_by_name") @db.VarChar(100)
+  approvedByName  String?         @map("approved_by_name") @db.VarChar(100)
+  approvedAt      DateTime?       @map("approved_at")
   createdAt       DateTime        @default(now()) @map("created_at")
   updatedAt       DateTime        @updatedAt @map("updated_at")
 
@@ -554,6 +596,7 @@ model Finance {
   createdByUser User? @relation("CreatedBy", fields: [createdBy], references: [id], onDelete: SetNull)
   purchases Purchase[]
   assetMaintenances AssetMaintenance[]
+  repairRequests    TenantRepairRequest[]
 
   @@index([projectId])
   @@index([type])
@@ -617,6 +660,10 @@ model UtilityBilling {
   paymentStatus PaymentStatus @default(UNPAID) @map("payment_status")
   invoicedAt    DateTime?     @map("invoiced_at")
   notes         String?
+  createdByName String?       @map("created_by_name") @db.VarChar(100)
+  updatedByName String?       @map("updated_by_name") @db.VarChar(100)
+  approvedByName String?      @map("approved_by_name") @db.VarChar(100)
+  approvedAt    DateTime?     @map("approved_at")
   createdAt     DateTime      @default(now()) @map("created_at")
 
   room    Room    @relation(fields: [roomId], references: [id], onDelete: Cascade)
@@ -747,6 +794,10 @@ model Purchase {
   financeId      Int?           @map("finance_id")
   receivedAt     DateTime?      @map("received_at")
   createdBy      Int?           @map("created_by")
+  createdByName  String?        @map("created_by_name") @db.VarChar(100)
+  updatedByName  String?        @map("updated_by_name") @db.VarChar(100)
+  approvedByName String?        @map("approved_by_name") @db.VarChar(100)
+  approvedAt     DateTime?      @map("approved_at")
   createdAt      DateTime       @default(now()) @map("created_at")
   updatedAt      DateTime       @updatedAt @map("updated_at")
 
@@ -847,6 +898,10 @@ model AssetMaintenance {
   completedAt DateTime?         @map("completed_at")
   financeId   Int?              @map("finance_id")
   createdBy   Int?              @map("created_by")
+  createdByName String?         @map("created_by_name") @db.VarChar(100)
+  updatedByName String?         @map("updated_by_name") @db.VarChar(100)
+  approvedByName String?        @map("approved_by_name") @db.VarChar(100)
+  approvedAt   DateTime?        @map("approved_at")
 
   asset         RoomAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
   room          Room?     @relation(fields: [roomId], references: [id], onDelete: SetNull)
@@ -869,6 +924,8 @@ model CheckoutInspection {
   notes           String?
   inspectedAt     DateTime         @default(now()) @map("inspected_at")
   inspectedBy     Int?             @map("inspected_by")
+  createdByName   String?          @map("created_by_name") @db.VarChar(100)
+  updatedByName   String?          @map("updated_by_name") @db.VarChar(100)
 
   tenant          Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   room            Room      @relation(fields: [roomId], references: [id], onDelete: Cascade)
@@ -889,10 +946,113 @@ model AssetTransaction {
   tenantId   Int?         @map("tenant_id")
   notes      String?
   createdBy  Int?         @map("created_by")
+  createdByName String?   @map("created_by_name") @db.VarChar(100)
+  updatedByName String?   @map("updated_by_name") @db.VarChar(100)
   createdAt  DateTime     @default(now()) @map("created_at")
 
   asset RoomAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
 
   @@index([assetId])
   @@map("asset_transactions")
+}
+
+model AppMenu {
+  id          Int      @id @default(autoincrement())
+  key         String   @unique @db.VarChar(80)
+  name        String   @db.VarChar(120)
+  href        String?  @db.VarChar(200)
+  parentKey   String?  @map("parent_key") @db.VarChar(80)
+  moduleKey   String   @map("module_key") @db.VarChar(40)
+  icon        String?  @db.VarChar(40)
+  sortOrder   Int      @default(0) @map("sort_order")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  parent      AppMenu?  @relation("MenuTree", fields: [parentKey], references: [key], onDelete: SetNull)
+  children    AppMenu[] @relation("MenuTree")
+  permissions RoleMenuPermission[]
+
+  @@index([parentKey])
+  @@index([moduleKey])
+  @@map("app_menus")
+}
+
+model RoleMenuPermission {
+  id        Int      @id @default(autoincrement())
+  role      UserRole
+  menuKey   String   @map("menu_key") @db.VarChar(80)
+  canView   Boolean  @default(false) @map("can_view")
+  canCreate Boolean  @default(false) @map("can_create")
+  canUpdate Boolean  @default(false) @map("can_update")
+  canDelete Boolean  @default(false) @map("can_delete")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  menu AppMenu @relation(fields: [menuKey], references: [key], onDelete: Cascade)
+
+  @@unique([role, menuKey])
+  @@index([role])
+  @@map("role_menu_permissions")
+}
+
+model Announcement {
+  id            Int       @id @default(autoincrement())
+  projectId     Int?      @map("project_id")
+  title         String    @db.VarChar(200)
+  content       String
+  audience      String    @default("TENANT") @db.VarChar(30)
+  publishedAt   DateTime  @default(now()) @map("published_at")
+  expiresAt     DateTime? @map("expires_at")
+  isActive      Boolean   @default(true) @map("is_active")
+  createdBy     Int?      @map("created_by")
+  createdByName String?   @map("created_by_name") @db.VarChar(100)
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  project Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@index([projectId])
+  @@index([isActive, publishedAt])
+  @@map("announcements")
+}
+
+model TenantRepairRequest {
+  id              Int                 @id @default(autoincrement())
+  tenantId        Int                 @map("tenant_id")
+  roomId          Int                 @map("room_id")
+  projectId       Int?                @map("project_id")
+  category        RepairCategory
+  title           String              @db.VarChar(200)
+  description     String?             @db.Text
+  status          RepairRequestStatus @default(REQUESTED)
+  priority        String              @default("NORMAL") @db.VarChar(20)
+  photoUrls       Json?               @map("photo_urls")
+  inspectionNotes String?             @map("inspection_notes") @db.Text
+  inspectionAt    DateTime?           @map("inspection_at")
+  inspectedBy     Int?                @map("inspected_by")
+  inspectedByName String?             @map("inspected_by_name") @db.VarChar(100)
+  resolutionNotes String?             @map("resolution_notes") @db.Text
+  completedAt     DateTime?           @map("completed_at")
+  completedByName String?             @map("completed_by_name") @db.VarChar(100)
+  cost            Decimal             @default(0) @db.Decimal(12, 2)
+  financeId       Int?                @map("finance_id")
+  reportedAt      DateTime            @default(now()) @map("reported_at")
+  createdBy       Int?                @map("created_by")
+  createdByName   String?             @map("created_by_name") @db.VarChar(100)
+  updatedByName   String?             @map("updated_by_name") @db.VarChar(100)
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime            @updatedAt @map("updated_at")
+
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  room          Room     @relation(fields: [roomId], references: [id], onDelete: Restrict)
+  project       Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  inspectedByUser User?  @relation("RepairInspectedBy", fields: [inspectedBy], references: [id], onDelete: SetNull)
+  finance       Finance? @relation(fields: [financeId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([roomId])
+  @@index([projectId])
+  @@index([status])
+  @@map("tenant_repair_requests")
 }

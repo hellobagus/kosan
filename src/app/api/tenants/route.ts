@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { Prisma, TenantStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { getSession } from "@/lib/auth";
 import {
   calcDueDate,
   calcTotalAmount,
@@ -17,6 +16,8 @@ import {
 import { getKosanProfile } from "@/lib/settings-service";
 import { requireProjectContext, roomProjectFilter } from "@/lib/project-context";
 import { generateInvoiceNumber } from "@/lib/document-number";
+import { requireStaffModule } from "@/lib/api-auth";
+import { withCreateAudit, withUpdateAudit } from "@/lib/audit";
 
 function parseStatusParam(value: string | null): TenantStatus | undefined {
   if (!value) return undefined;
@@ -26,7 +27,7 @@ function parseStatusParam(value: string | null): TenantStatus | undefined {
 
 export async function GET(request: NextRequest) {
   try {
-    const auth = await requireProjectContext();
+    const auth = await requireStaffModule("tenant", "view");
     if ("error" in auth) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
@@ -57,8 +58,11 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getSession();
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireStaffModule("tenant", "create");
+    if ("error" in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
+    const session = auth.session;
 
     const body = await request.json();
     const {
@@ -89,15 +93,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Kamar tidak ditemukan" }, { status: 400 });
     }
 
-    const auth = await requireProjectContext();
-    if ("error" in auth) {
-      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    const projectAuth = await requireProjectContext();
+    if ("error" in projectAuth) {
+      return NextResponse.json({ error: projectAuth.error }, { status: projectAuth.status });
     }
-    if (room.floorRef?.building.projectId !== auth.context.projectId) {
+    if (room.floorRef?.building.projectId !== projectAuth.context.projectId) {
       return NextResponse.json({ error: "Kamar tidak termasuk project aktif" }, { status: 400 });
     }
 
-    const invoiceNo = await generateInvoiceNumber(auth.context.entityId, auth.context.projectId);
+    const invoiceNo = await generateInvoiceNumber(projectAuth.context.entityId, projectAuth.context.projectId);
 
     const tenantStatus = status || (contractRequested ? "PENDING" : "ACTIVE");
     const preActiveStatuses = ["PENDING", "APPROVED", "CONTRACT_SENT", "CONTRACT_SIGNED", "RESERVED"];
@@ -243,6 +247,7 @@ export async function POST(request: NextRequest) {
           invoiceNumber: invoiceNo,
           lastPaymentDate: paid > 0 ? checkInDate : null,
           isDaily: isDaily || lease === "1 Hari",
+          ...withCreateAudit(session),
         },
         include: { user: true, room: true },
       });
@@ -266,6 +271,8 @@ export async function POST(request: NextRequest) {
             roomId: parseInt(roomId),
             projectId: auth.context.projectId,
             createdBy: session.userId,
+            createdByName: session.name,
+            updatedByName: session.name,
           },
         });
       }
@@ -282,6 +289,8 @@ export async function POST(request: NextRequest) {
             roomId: parseInt(roomId),
             projectId: auth.context.projectId,
             createdBy: session.userId,
+            createdByName: session.name,
+            updatedByName: session.name,
           },
         });
       }
@@ -306,18 +315,27 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    const session = await getSession();
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireStaffModule("tenant", "create");
+    if ("error" in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
+    const session = auth.session;
 
     const body = await request.json();
     const { id, action } = body;
 
     const tenant = await prisma.tenant.findUnique({
       where: { id: parseInt(id) },
-      include: { user: true, room: true },
+      include: {
+        user: true,
+        room: { include: { floorRef: { include: { building: true } } } },
+      },
     });
 
     if (!tenant) return NextResponse.json({ error: "Penghuni tidak ditemukan" }, { status: 404 });
+    if (tenant.room.floorRef?.building.projectId !== auth.context.projectId) {
+      return NextResponse.json({ error: "Penghuni tidak termasuk project aktif" }, { status: 403 });
+    }
 
     if (action === "checkout" || action === "checkout_with_inspection") {
       const { checkOut, inspections } = body;
@@ -362,6 +380,7 @@ export async function PUT(request: NextRequest) {
           paidAmount: 0,
           paymentStatus: "UNPAID",
           extensionDate: new Date(),
+          ...withUpdateAudit(session),
         },
         include: { user: true, room: true },
       });
@@ -412,6 +431,7 @@ export async function PUT(request: NextRequest) {
           paymentStatus: payStatus as "UNPAID" | "PARTIAL" | "PAID",
           lastPaymentDate: paid > 0 ? new Date() : tenant.lastPaymentDate,
           emergencyPhone: emergencyPhone !== undefined ? (emergencyPhone || null) : tenant.emergencyPhone,
+          ...withUpdateAudit(session),
         },
         include: { user: true, room: true },
       });
@@ -441,7 +461,7 @@ export async function PUT(request: NextRequest) {
       });
       const updated = await prisma.tenant.update({
         where: { id: parseInt(id) },
-        data: { notes: notes ?? tenant.notes },
+        data: { notes: notes ?? tenant.notes, ...withUpdateAudit(session) },
         include: { user: true, room: true },
       });
       return NextResponse.json(updated);
@@ -534,15 +554,23 @@ export async function PUT(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const session = await getSession();
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireStaffModule("tenant", "full");
+    if ("error" in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
 
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
     if (!id) return NextResponse.json({ error: "ID wajib" }, { status: 400 });
 
-    const tenant = await prisma.tenant.findUnique({ where: { id: parseInt(id) } });
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: parseInt(id) },
+      include: { room: { include: { floorRef: { include: { building: true } } } } },
+    });
     if (!tenant) return NextResponse.json({ error: "Penghuni tidak ditemukan" }, { status: 404 });
+    if (tenant.room.floorRef?.building.projectId !== auth.context.projectId) {
+      return NextResponse.json({ error: "Penghuni tidak termasuk project aktif" }, { status: 403 });
+    }
 
     await prisma.$transaction(async (tx) => {
       await tx.tenant.delete({ where: { id: parseInt(id) } });

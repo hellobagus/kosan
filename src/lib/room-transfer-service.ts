@@ -108,6 +108,15 @@ function ensureStep(current: RoomTransferStatus, allowed: RoomTransferStatus[]) 
   }
 }
 
+async function resolveActorName(userId?: number) {
+  if (!userId) return null;
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { name: true },
+  });
+  return user?.name ?? null;
+}
+
 async function getTransferOrThrow(id: number) {
   const transfer = await prisma.roomTransfer.findUnique({
     where: { id },
@@ -172,6 +181,7 @@ export async function createRoomTransferRequest(input: {
   reason?: string;
   requestedBy?: number;
 }) {
+  const actorName = await resolveActorName(input.requestedBy);
   const tenant = await prisma.tenant.findUnique({
     where: { id: input.tenantId },
     include: { room: true },
@@ -183,6 +193,7 @@ export async function createRoomTransferRequest(input: {
   const targetRoom = await prisma.room.findUnique({
     where: { id: input.toRoomId },
     include: {
+      floorRef: { include: { building: { select: { projectId: true } } } },
       tenants: {
         where: { status: "ACTIVE" },
         select: { id: true },
@@ -194,6 +205,12 @@ export async function createRoomTransferRequest(input: {
     throw new Error("Kamar tujuan harus berstatus kosong (available)");
   }
   if (targetRoom.tenants.length > 0) throw new Error("Kamar tujuan masih ditempati penghuni aktif");
+
+  const fromOrg = await resolveProjectFromRoom(tenant.roomId);
+  const toProjectId = targetRoom.floorRef?.building.projectId;
+  if (fromOrg?.projectId && toProjectId && fromOrg.projectId !== toProjectId) {
+    throw new Error("Kamar tujuan harus berada dalam project yang sama dengan kamar saat ini");
+  }
 
   const openTransfer = await prisma.roomTransfer.findFirst({
     where: {
@@ -213,6 +230,8 @@ export async function createRoomTransferRequest(input: {
       requestedBy: input.requestedBy,
       effectiveDate: startOfDay(input.effectiveDate),
       reason: input.reason || null,
+      createdByName: actorName,
+      updatedByName: actorName,
       currentMonthlyRent: tenant.monthlyRent,
       newMonthlyRent: targetRoom.price,
       currentDeposit: tenant.deposit,
@@ -225,6 +244,7 @@ export async function createRoomTransferRequest(input: {
 export async function approveRoomTransfer(id: number, userId: number, adminNotes?: string) {
   const transfer = await getTransferOrThrow(id);
   ensureStep(transfer.status, ["REQUESTED"]);
+  const actorName = await resolveActorName(userId);
 
   const updated = await prisma.$transaction(async (tx) => {
     const activeTenant = await tx.tenant.findUnique({ where: { id: transfer.tenantId } });
@@ -239,7 +259,9 @@ export async function approveRoomTransfer(id: number, userId: number, adminNotes
         status: "APPROVED",
         approvedAt: new Date(),
         approvedBy: userId,
+        approvedByName: actorName,
         adminNotes: adminNotes || transfer.adminNotes,
+        updatedByName: actorName,
       },
       include: TRANSFER_INCLUDE,
     });
@@ -492,6 +514,7 @@ export async function updateTransferContract(id: number) {
 export async function updateTransferBilling(id: number, userId?: number) {
   const transfer = await getTransferOrThrow(id);
   ensureStep(transfer.status, ["CONTRACT_UPDATED", "BILLING_UPDATED"]);
+  const actorName = await resolveActorName(userId);
 
   const amount = parseAmount(transfer.financeAdjustmentAmount);
   await prisma.$transaction(async (tx) => {
@@ -509,6 +532,8 @@ export async function updateTransferBilling(id: number, userId?: number) {
           tenantId: transfer.tenantId,
           roomId: transfer.toRoomId,
           createdBy: userId,
+          createdByName: actorName,
+          updatedByName: actorName,
         },
       });
     }
@@ -518,6 +543,7 @@ export async function updateTransferBilling(id: number, userId?: number) {
       data: {
         status: "BILLING_UPDATED",
         billingUpdatedAt: new Date(),
+        updatedByName: actorName,
       },
     });
   });
@@ -613,6 +639,7 @@ export async function cancelRoomTransfer(id: number, notes?: string) {
       status: "CANCELLED",
       cancelledAt: new Date(),
       adminNotes: notes ? [transfer.adminNotes, notes].filter(Boolean).join("\n") : transfer.adminNotes,
+      updatedByName: transfer.approvedByUser?.name || transfer.requestedByUser?.name || transfer.updatedByName,
     },
     include: TRANSFER_INCLUDE,
   });

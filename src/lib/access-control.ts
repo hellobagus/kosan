@@ -1,5 +1,6 @@
 import { UserRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { isSuperAdmin } from "@/lib/rbac";
 
 export type AccessibleProject = {
   id: number;
@@ -13,7 +14,7 @@ export type AccessibleProject = {
 };
 
 export async function getAccessibleEntities(userId: number, role: UserRole) {
-  if (role === "OWNER") {
+  if (isSuperAdmin(role)) {
     return prisma.entity.findMany({
       where: { active: true },
       include: { holding: { select: { id: true, name: true, code: true } } },
@@ -41,7 +42,7 @@ export async function getAccessibleProjects(
   role: UserRole,
   entityId?: number
 ): Promise<AccessibleProject[]> {
-  if (role === "OWNER") {
+  if (isSuperAdmin(role)) {
     const projects = await prisma.project.findMany({
       where: {
         active: true,

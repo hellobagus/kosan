@@ -16,10 +16,10 @@ export default async function DashboardLayout({
     <div className="min-h-screen bg-slate-50">
       <Sidebar
         userName={session?.name || "User"}
-        userRole={session?.role || "MANAGER"}
+        userRole={session?.role || "PROJECT_MANAGER"}
       />
       <div className="lg:pl-72 flex flex-col min-h-screen">
-        <AppHeader userRole={session?.role || "MANAGER"} />
+        <AppHeader userRole={session?.role || "PROJECT_MANAGER"} />
         <main className="flex-1">
           <ProjectRefreshProvider>
             <div className="p-6 lg:p-8">{children}</div>

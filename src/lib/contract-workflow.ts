@@ -6,6 +6,7 @@ import { kosanProfileToContractProfile } from "@/lib/contract-profile";
 import { htmlToPdfBuffer } from "@/lib/contract-pdf";
 import { sendEmail, isEmailConfigured } from "@/lib/email-service";
 import { activateRoomAssetsForTenant } from "@/lib/inventory-service";
+import { appUrl as buildAppUrl } from "@/lib/app-url";
 
 const WORKFLOW_STATUSES: TenantStatus[] = [
   "PENDING",
@@ -35,10 +36,20 @@ export async function approveTenant(tenantId: number, userId: number) {
   if (tenant.status !== "PENDING") {
     return { ok: false as const, error: "Hanya calon penghuni (PENDING) yang dapat diverifikasi" };
   }
+  const approver = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { name: true },
+  });
 
   const updated = await prisma.tenant.update({
     where: { id: tenantId },
-    data: { status: "APPROVED", approvedAt: new Date(), approvedBy: userId },
+    data: {
+      status: "APPROVED",
+      approvedAt: new Date(),
+      approvedBy: userId,
+      approvedByName: approver?.name ?? null,
+      updatedByName: approver?.name ?? null,
+    },
     include: { user: true, room: true },
   });
   return { ok: true as const, tenant: updated };
@@ -74,8 +85,8 @@ export async function sendContractEmail(tenantId: number) {
     toContractTenant(tenant)
   );
 
-  const appUrl = process.env.APP_URL || "http://localhost:3000";
-  const viewUrl = `${appUrl}/api/tenants/${tenantId}/contract?format=pdf`;
+  const baseUrl = buildAppUrl("/", undefined);
+  const viewUrl = `${baseUrl}/api/tenants/${tenantId}/contract?format=pdf`;
   const pdfFilename = `Kontrak_Sewa_${tenant.user.name.replace(/\s+/g, "_")}.pdf`;
 
   let pdfBuffer: Buffer;
@@ -188,6 +199,10 @@ export async function checkinTenant(tenantId: number, userId: number) {
       return { ok: false as const, error: "Kamar sudah terisi penghuni aktif lain" };
     }
   }
+  const actor = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { name: true },
+  });
 
   const updated = await prisma.$transaction(async (tx) => {
     const t = await tx.tenant.update({
@@ -195,6 +210,7 @@ export async function checkinTenant(tenantId: number, userId: number) {
       data: {
         status: "ACTIVE",
         inventoryBaAt: tenant.inventoryBaAt || new Date(),
+        updatedByName: actor?.name ?? null,
       },
       include: { user: true, room: true },
     });
@@ -222,6 +238,10 @@ export async function refundDeposit(tenantId: number, amount: number, userId: nu
   if (tenant.depositRefundedAt) {
     return { ok: false as const, error: "Deposit sudah dikembalikan" };
   }
+  const actor = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { name: true },
+  });
 
   const updated = await prisma.$transaction(async (tx) => {
     const t = await tx.tenant.update({
@@ -229,6 +249,7 @@ export async function refundDeposit(tenantId: number, amount: number, userId: nu
       data: {
         depositRefundAmount: amount,
         depositRefundedAt: new Date(),
+        updatedByName: actor?.name ?? null,
       },
       include: { user: true, room: true },
     });
@@ -244,6 +265,8 @@ export async function refundDeposit(tenantId: number, amount: number, userId: nu
           tenantId,
           roomId: tenant.roomId,
           createdBy: userId,
+          createdByName: actor?.name ?? null,
+          updatedByName: actor?.name ?? null,
         },
       });
     }

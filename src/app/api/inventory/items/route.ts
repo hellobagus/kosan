@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireProjectContext } from "@/lib/project-context";
+import { requireStaffModule } from "@/lib/api-auth";
 
 export async function GET(request: NextRequest) {
   try {
-    const auth = await requireProjectContext();
+    const auth = await requireStaffModule("inventory", "view");
     if ("error" in auth) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const auth = await requireProjectContext();
+    const auth = await requireStaffModule("inventory", "create");
     if ("error" in auth) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    const auth = await requireProjectContext();
+    const auth = await requireStaffModule("inventory", "create");
     if ("error" in auth) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
@@ -100,7 +100,7 @@ export async function PUT(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const auth = await requireProjectContext();
+    const auth = await requireStaffModule("inventory", "full");
     if ("error" in auth) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }

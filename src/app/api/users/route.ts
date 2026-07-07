@@ -1,16 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
+import { UserRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { getSession } from "@/lib/auth";
+import { ROLE_OPTIONS } from "@/lib/rbac";
+import { requireSession, requireModule, isAuthFailure } from "@/lib/api-auth";
 
 export async function GET(request: NextRequest) {
   try {
+    const session = await requireSession();
+    if (isAuthFailure(session)) {
+      return NextResponse.json({ error: session.error }, { status: session.status });
+    }
+    const denied = await requireModule(session, "accounts", "view");
+    if (denied) return NextResponse.json({ error: denied.error }, { status: denied.status });
+
     const { searchParams } = new URL(request.url);
     const role = searchParams.get("role");
+    const whereRole = role && ROLE_OPTIONS.includes(role as UserRole) ? (role as UserRole) : undefined;
 
-    const where = role
-      ? { role: role as "OWNER" | "MANAGER" | "TENANT" }
-      : {};
+    const where = whereRole ? { role: whereRole } : {};
 
     const users = await prisma.user.findMany({
       where,
@@ -40,8 +48,12 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getSession();
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const session = await requireSession();
+    if (isAuthFailure(session)) {
+      return NextResponse.json({ error: session.error }, { status: session.status });
+    }
+    const denied = await requireModule(session, "accounts", "create");
+    if (denied) return NextResponse.json({ error: denied.error }, { status: denied.status });
 
     const body = await request.json();
     const { name, email, password, phone, role, address } = body;
@@ -85,6 +97,13 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
+    const session = await requireSession();
+    if (isAuthFailure(session)) {
+      return NextResponse.json({ error: session.error }, { status: session.status });
+    }
+    const denied = await requireModule(session, "accounts", "create");
+    if (denied) return NextResponse.json({ error: denied.error }, { status: denied.status });
+
     const body = await request.json();
     const { id, isActive, password, ...data } = body;
 

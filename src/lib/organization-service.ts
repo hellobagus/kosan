@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { ROLE_OPTIONS } from "@/lib/rbac";
 
 export async function ensureDefaultOrganization() {
   const holdingCount = await prisma.holding.count();
@@ -106,7 +107,7 @@ export async function ensureDefaultOrganization() {
   await prisma.finance.updateMany({ where: { projectId: null }, data: { projectId: project.id } });
 
   const staff = await prisma.user.findMany({
-    where: { role: { in: ["OWNER", "MANAGER"] } },
+    where: { role: { in: ROLE_OPTIONS.filter((role) => role !== "TENANT") } },
   });
   for (const user of staff) {
     await prisma.userEntityAccess.upsert({

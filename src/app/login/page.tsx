@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Building2, Eye, EyeOff } from "lucide-react";
+import { LOGIN_DEMO_ACCOUNTS } from "@/lib/demo-accounts";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -31,7 +32,7 @@ export default function LoginPage() {
         return;
       }
 
-      router.push("/dashboard");
+      router.push(data.user?.role === "TENANT" ? "/portal" : "/dashboard");
       router.refresh();
     } catch {
       setError("Terjadi kesalahan. Silakan coba lagi.");
@@ -150,10 +151,26 @@ export default function LoginPage() {
             </form>
 
             <div className="mt-6 p-4 bg-slate-50 rounded-lg border border-slate-200">
-              <p className="text-xs font-medium text-slate-500 mb-2">Akun Demo:</p>
-              <div className="space-y-1 text-xs text-slate-600">
-                <p><span className="font-medium">Admin:</span> admin@kosanku.com / admin123</p>
-                <p><span className="font-medium">Pengelola:</span> manager@kosanku.com / manager123</p>
+              <p className="text-xs font-medium text-slate-500 mb-2">Akun Demo (klik untuk isi otomatis):</p>
+              <div className="space-y-1">
+                {LOGIN_DEMO_ACCOUNTS.map((account) => (
+                  <button
+                    key={account.email}
+                    type="button"
+                    onClick={() => {
+                      setEmail(account.email);
+                      setPassword(account.password);
+                      setError("");
+                    }}
+                    className="w-full text-left text-xs text-slate-600 hover:bg-white hover:text-teal-700 rounded px-2 py-1.5 transition-colors"
+                  >
+                    <span className="font-medium text-slate-700">{account.role}:</span>{" "}
+                    {account.email} / {account.password}
+                    {account.phone && (
+                      <span className="block text-slate-500 mt-0.5">WA: {account.phone}</span>
+                    )}
+                  </button>
+                ))}
               </div>
             </div>
           </div>

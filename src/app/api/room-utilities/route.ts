@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getSession } from "@/lib/auth";
-import { requireProjectContext, roomProjectFilter } from "@/lib/project-context";
+import { requireStaffModule } from "@/lib/api-auth";
+import { roomProjectFilter } from "@/lib/project-context";
 
 export async function GET(request: NextRequest) {
   try {
-    const auth = await requireProjectContext();
+    const auth = await requireStaffModule("utility", "view");
     if ("error" in auth) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
@@ -36,8 +36,10 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getSession();
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireStaffModule("utility", "create");
+    if ("error" in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
 
     const body = await request.json();
     const { roomId, utilityId, customAmount, lastReading, active } = body;
@@ -91,8 +93,10 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    const session = await getSession();
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireStaffModule("utility", "create");
+    if ("error" in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
 
     const body = await request.json();
     const { id, customAmount, lastReading, active } = body;
@@ -120,8 +124,10 @@ export async function PUT(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const session = await getSession();
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireStaffModule("utility", "full");
+    if ("error" in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
 
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");

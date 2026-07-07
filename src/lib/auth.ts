@@ -2,6 +2,7 @@ import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { UserRole } from "@prisma/client";
+import { isStaffRole } from "@/lib/rbac";
 
 const secretKey = process.env.JWT_SECRET || "fallback-secret-key";
 const key = new TextEncoder().encode(secretKey);
@@ -71,5 +72,5 @@ export async function deleteSession() {
 }
 
 export function isStaff(role: UserRole) {
-  return role === "OWNER" || role === "MANAGER";
+  return isStaffRole(role);
 }

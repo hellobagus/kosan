@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useProjectRefreshKey } from "@/hooks/useProjectRefresh";
 import { CheckCircle, Play } from "lucide-react";
 import {
-  PageHeader, Card, CardBody, Table, Th, Td, Badge, EmptyState, Button, Input,
+  Card, CardBody, Table, Th, Td, Badge, EmptyState, Button, Input,
 } from "@/components/ui";
 import { formatCurrency, formatShortDate } from "@/lib/utils";
 import { MAINTENANCE_STATUS_LABELS } from "@/lib/inventory-service";
@@ -29,16 +29,16 @@ export default function MaintenanceBoard() {
   const [completing, setCompleting] = useState<number | null>(null);
   const [cost, setCost] = useState("");
 
-  const fetchData = () => {
+  const fetchData = useCallback(() => {
     setLoading(true);
     const params = filter ? `?status=${filter}` : "";
     fetch(`/api/inventory/maintenance${params}`)
       .then((r) => r.json())
       .then(setMaintenances)
       .finally(() => setLoading(false));
-  };
+  }, [filter]);
 
-  useEffect(() => { fetchData(); }, [filter, refreshKey]);
+  useEffect(() => { fetchData(); }, [fetchData, refreshKey]);
 
   const handleAction = async (id: number, action: string, extra?: Record<string, unknown>) => {
     await fetch("/api/inventory/maintenance", {
@@ -51,8 +51,6 @@ export default function MaintenanceBoard() {
 
   return (
     <div>
-      <PageHeader title="Maintenance" description="Kelola perbaikan barang rusak di kamar" />
-
       <div className="flex gap-2 mb-6">
         {["OPEN", "IN_PROGRESS", "COMPLETED", ""].map((s) => (
           <Button key={s || "all"} variant={filter === s ? "primary" : "secondary"}

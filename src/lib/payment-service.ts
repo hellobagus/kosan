@@ -28,6 +28,7 @@ export async function applySuccessfulPayment(
     transactionId?: string | null;
     notes?: string | null;
     createdBy?: number | null;
+    createdByName?: string | null;
   }
 ) {
   const payment = await tx.payment.findUnique({ where: { orderId: params.orderId } });
@@ -57,6 +58,9 @@ export async function applySuccessfulPayment(
       status: "SUCCESS",
       transactionId: params.transactionId || payment.transactionId,
       notes: params.notes ?? payment.notes,
+      approvedAt: new Date(),
+      approvedByName: params.createdByName ?? payment.approvedByName,
+      updatedByName: params.createdByName ?? payment.updatedByName,
     },
   });
 
@@ -66,6 +70,7 @@ export async function applySuccessfulPayment(
       paidAmount: newPaid,
       paymentStatus: payStatus,
       lastPaymentDate: new Date(),
+      updatedByName: params.createdByName ?? tenant.updatedByName,
     },
   });
 
@@ -87,6 +92,8 @@ export async function applySuccessfulPayment(
         tenantId: params.tenantId,
         roomId: tenant.roomId,
         createdBy: params.createdBy ?? null,
+        createdByName: params.createdByName ?? null,
+        updatedByName: params.createdByName ?? null,
       },
     });
   }
@@ -102,6 +109,8 @@ export async function applySuccessfulPayment(
         tenantId: params.tenantId,
         roomId: tenant.roomId,
         createdBy: params.createdBy ?? null,
+        createdByName: params.createdByName ?? null,
+        updatedByName: params.createdByName ?? null,
       },
     });
   }
@@ -115,6 +124,7 @@ export async function recordManualPayment(params: {
   method: "CASH" | "TRANSFER";
   notes?: string;
   createdBy?: number;
+  createdByName?: string;
 }) {
   if (params.amount <= 0) {
     throw new Error("Nominal pembayaran harus lebih dari 0");
@@ -144,6 +154,8 @@ export async function recordManualPayment(params: {
         status: "PENDING",
         orderId,
         notes: params.notes || null,
+        createdByName: params.createdByName ?? null,
+        updatedByName: params.createdByName ?? null,
       },
     });
 
@@ -154,6 +166,7 @@ export async function recordManualPayment(params: {
       orderId,
       notes: params.notes,
       createdBy: params.createdBy,
+      createdByName: params.createdByName,
     });
 
     const updatedTenant = await tx.tenant.findUnique({
@@ -170,6 +183,7 @@ export async function createMidtransPayment(params: {
   amount: number;
   notes?: string;
   createdBy?: number;
+  createdByName?: string;
 }) {
   if (params.amount <= 0) {
     throw new Error("Nominal pembayaran harus lebih dari 0");
@@ -198,6 +212,8 @@ export async function createMidtransPayment(params: {
       status: "PENDING",
       orderId,
       notes: params.notes || null,
+      createdByName: params.createdByName ?? null,
+      updatedByName: params.createdByName ?? null,
     },
   });
 
@@ -209,6 +225,7 @@ export async function updateMidtransPaymentStatus(params: {
   transactionId?: string;
   transactionStatus: string;
   createdBy?: number | null;
+  createdByName?: string | null;
 }) {
   const payment = await prisma.payment.findUnique({ where: { orderId: params.orderId } });
   if (!payment) return null;
@@ -231,6 +248,7 @@ export async function updateMidtransPaymentStatus(params: {
         transactionId: params.transactionId,
         notes: payment.notes,
         createdBy: params.createdBy,
+      createdByName: params.createdByName,
       })
     );
   }
@@ -243,6 +261,7 @@ export async function updateMidtransPaymentStatus(params: {
     data: {
       status: failedStatus,
       transactionId: params.transactionId || payment.transactionId,
+      updatedByName: params.createdByName ?? payment.updatedByName,
     },
   });
 }

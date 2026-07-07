@@ -1,17 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getSession } from "@/lib/auth";
+import { requireStaffModule } from "@/lib/api-auth";
 import { deployAssetToRoom, deployAssetToSharedArea } from "@/lib/inventory-service";
 
 export async function GET(request: NextRequest) {
   try {
+    const auth = await requireStaffModule("inventory", "view");
+    if ("error" in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
+
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status");
     const roomId = searchParams.get("roomId");
     const sharedAreaId = searchParams.get("sharedAreaId");
     const locationType = searchParams.get("locationType");
 
-    const where: Record<string, unknown> = {};
+    const where: Record<string, unknown> = {
+      item: { projectId: auth.context.projectId },
+    };
     if (status) where.status = status;
     if (roomId) where.roomId = parseInt(roomId);
     if (sharedAreaId) where.sharedAreaId = parseInt(sharedAreaId);
@@ -37,8 +44,11 @@ export async function GET(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    const session = await getSession();
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireStaffModule("inventory", "create");
+    if ("error" in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
+    const session = auth.session;
 
     const { id, action, roomId, sharedAreaId, utilityId } = await request.json();
     if (!id || !action) return NextResponse.json({ error: "Data wajib belum lengkap" }, { status: 400 });

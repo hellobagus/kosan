@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSession, isStaff } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { canAccessBillingRecord, isAuthFailure, requireSession } from "@/lib/api-auth";
 import { buildInvoiceBreakdown } from "@/lib/utility-invoice-service";
 import { getProjectProfileForRoom, getBankAccounts } from "@/lib/settings-service";
 
@@ -9,9 +9,9 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const session = await requireSession();
+    if (isAuthFailure(session)) {
+      return NextResponse.json({ error: session.error }, { status: session.status });
     }
 
     const { id } = await params;
@@ -24,8 +24,8 @@ export async function GET(
     if (!tenant) {
       return NextResponse.json({ error: "Penghuni tidak ditemukan" }, { status: 404 });
     }
-    if (!isStaff(session.role) && tenant.userId !== session.userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!canAccessBillingRecord(session, tenant.userId)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const profile = await getProjectProfileForRoom(tenant.roomId);

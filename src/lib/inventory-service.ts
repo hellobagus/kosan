@@ -105,9 +105,19 @@ async function logTransaction(
     tenantId?: number | null;
     notes?: string;
     createdBy?: number;
+    createdByName?: string | null;
   }
 ) {
   await tx.assetTransaction.create({ data });
+}
+
+async function resolveActorName(tx: Prisma.TransactionClient, userId?: number) {
+  if (!userId) return null;
+  const user = await tx.user.findUnique({
+    where: { id: userId },
+    select: { name: true },
+  });
+  return user?.name ?? null;
 }
 
 export async function receivePurchase(
@@ -115,6 +125,7 @@ export async function receivePurchase(
   userId?: number
 ) {
   return prisma.$transaction(async (tx) => {
+    const actorName = await resolveActorName(tx, userId);
     const purchase = await tx.purchase.findUnique({
       where: { id: purchaseId },
       include: { items: { include: { item: true } } },
@@ -165,6 +176,7 @@ export async function receivePurchase(
           toStatus: "IN_WAREHOUSE",
           notes: `Dari pembelian ${purchase.purchaseNumber}`,
           createdBy: userId,
+          createdByName: actorName,
         });
       }
     }
@@ -177,6 +189,8 @@ export async function receivePurchase(
         category: "Pembelian Inventaris",
         transactionDate: new Date(),
         createdBy: userId,
+        createdByName: actorName,
+        updatedByName: actorName,
       },
     });
 
@@ -186,6 +200,9 @@ export async function receivePurchase(
         status: "RECEIVED",
         receivedAt: new Date(),
         financeId: finance.id,
+        approvedByName: actorName,
+        approvedAt: new Date(),
+        updatedByName: actorName,
       },
     });
 
@@ -336,6 +353,7 @@ export async function reportAssetDamage(
   data: { title: string; description?: string; tenantId?: number; userId?: number }
 ) {
   return prisma.$transaction(async (tx) => {
+    const actorName = await resolveActorName(tx, data.userId);
     const asset = await tx.roomAsset.findUnique({
       where: { id: assetId },
       include: { room: true },
@@ -356,6 +374,9 @@ export async function reportAssetDamage(
         title: data.title,
         description: data.description,
         status: "OPEN",
+        createdBy: data.userId,
+        createdByName: actorName,
+        updatedByName: actorName,
       },
       include: { asset: { include: { item: true } }, room: true },
     });
@@ -369,6 +390,7 @@ export async function reportAssetDamage(
       tenantId: data.tenantId || asset.tenantId,
       notes: data.title,
       createdBy: data.userId,
+      createdByName: actorName,
     });
 
     return maintenance;
@@ -380,6 +402,7 @@ export async function completeMaintenance(
   data: { cost?: number; userId?: number }
 ) {
   return prisma.$transaction(async (tx) => {
+    const actorName = await resolveActorName(tx, data.userId);
     const maintenance = await tx.assetMaintenance.findUnique({
       where: { id: maintenanceId },
       include: { asset: true },
@@ -398,6 +421,8 @@ export async function completeMaintenance(
           roomId: maintenance.roomId,
           tenantId: maintenance.tenantId,
           createdBy: data.userId,
+          createdByName: actorName,
+          updatedByName: actorName,
         },
       });
       financeId = finance.id;
@@ -410,6 +435,9 @@ export async function completeMaintenance(
         cost,
         completedAt: new Date(),
         financeId,
+        approvedByName: actorName,
+        approvedAt: new Date(),
+        updatedByName: actorName,
       },
     });
 
@@ -428,6 +456,7 @@ export async function completeMaintenance(
       tenantId: maintenance.tenantId,
       notes: `Maintenance selesai: ${maintenance.title}`,
       createdBy: data.userId,
+      createdByName: actorName,
     });
 
     return maintenance;
@@ -445,6 +474,7 @@ export async function inspectCheckoutAssets(
   userId?: number
 ) {
   return prisma.$transaction(async (tx) => {
+    const actorName = await resolveActorName(tx, userId);
     const tenant = await tx.tenant.findUnique({
       where: { id: tenantId },
       include: { room: true },
@@ -472,6 +502,8 @@ export async function inspectCheckoutAssets(
           depositDeducted,
           notes: insp.notes,
           inspectedBy: userId,
+          createdByName: actorName,
+          updatedByName: actorName,
         },
         include: { asset: { include: { item: true } } },
       });
@@ -495,6 +527,7 @@ export async function inspectCheckoutAssets(
         tenantId,
         notes: `Inspeksi: ${insp.result}`,
         createdBy: userId,
+        createdByName: actorName,
       });
 
       if (insp.result === "DAMAGED") {
@@ -506,6 +539,9 @@ export async function inspectCheckoutAssets(
             title: `Kerusakan saat checkout - ${record.asset.item.name}`,
             description: insp.notes,
             status: "OPEN",
+            createdBy: userId,
+            createdByName: actorName,
+            updatedByName: actorName,
           },
         });
       }
@@ -516,7 +552,7 @@ export async function inspectCheckoutAssets(
       const deduction = Math.min(totalDeduction, currentDeposit);
       await tx.tenant.update({
         where: { id: tenantId },
-        data: { deposit: currentDeposit - deduction },
+        data: { deposit: currentDeposit - deduction, updatedByName: actorName },
       });
       if (deduction > 0) {
         await tx.finance.create({
@@ -528,6 +564,8 @@ export async function inspectCheckoutAssets(
             tenantId,
             roomId: tenant.roomId,
             createdBy: userId,
+            createdByName: actorName,
+            updatedByName: actorName,
           },
         });
       }
@@ -649,6 +687,7 @@ export async function checkoutTenantWithInspection(
   }
 
   const updated = await prisma.$transaction(async (tx) => {
+    const actorName = await resolveActorName(tx, userId);
     const tenant = await tx.tenant.findUnique({ where: { id: tenantId } });
     if (!tenant) throw new Error("Penghuni tidak ditemukan");
     if (tenant.status !== "ACTIVE") throw new Error("Penghuni tidak aktif");
@@ -659,6 +698,7 @@ export async function checkoutTenantWithInspection(
         status: "COMPLETED",
         checkOut,
         checkoutInspectionAt: readiness.requiresInspection ? new Date() : tenant.checkoutInspectionAt,
+        updatedByName: actorName,
       },
       include: { user: true, room: true },
     });

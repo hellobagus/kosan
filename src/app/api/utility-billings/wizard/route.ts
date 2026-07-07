@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
+import { requireStaffModule } from "@/lib/api-auth";
 import {
   bulkSaveMeterReadings,
   generateLumpSumForPeriod,
@@ -10,6 +10,11 @@ import {
 
 export async function GET(request: NextRequest) {
   try {
+    const auth = await requireStaffModule("billing", "view");
+    if ("error" in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
+
     const { searchParams } = new URL(request.url);
     const invoiceMonth = parseInt(searchParams.get("invoiceMonth") || String(new Date().getMonth() + 1));
     const invoiceYear = parseInt(searchParams.get("invoiceYear") || String(new Date().getFullYear()));
@@ -24,8 +29,10 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getSession();
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireStaffModule("billing", "create");
+    if ("error" in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
 
     const body = await request.json();
     const { action, invoiceMonth, invoiceYear } = body;

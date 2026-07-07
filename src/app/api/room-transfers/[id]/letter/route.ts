@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
+import {
+  canAccessTenantRecord,
+  isAuthFailure,
+  requireSession,
+  requireStaffModule,
+} from "@/lib/api-auth";
+import { isStaffRole } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
 import { buildRoomTransferLetterHtml, generateRoomTransferLetter } from "@/lib/room-transfer-service";
 
@@ -8,14 +14,28 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getSession();
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const session = await requireSession();
+    if (isAuthFailure(session)) {
+      return NextResponse.json({ error: session.error }, { status: session.status });
+    }
 
     const { id } = await params;
     const transferId = parseInt(id, 10);
 
-    const transfer = await prisma.roomTransfer.findUnique({ where: { id: transferId } });
+    const transfer = await prisma.roomTransfer.findUnique({
+      where: { id: transferId },
+      include: { tenant: { select: { userId: true } } },
+    });
     if (!transfer) return NextResponse.json({ error: "Data pindah tidak ditemukan" }, { status: 404 });
+
+    if (isStaffRole(session.role)) {
+      const auth = await requireStaffModule("tenant", "view");
+      if ("error" in auth) {
+        return NextResponse.json({ error: auth.error }, { status: auth.status });
+      }
+    } else if (!canAccessTenantRecord(session, transfer.tenant.userId)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
 
     if (transfer.status === "FINANCIAL_CALCULATED") {
       await generateRoomTransferLetter(transferId);

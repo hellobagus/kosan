@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Building2, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { hasModuleAccess, isStaffRole } from "@/lib/rbac";
 
 type EntityOption = { id: number; code: string; name: string; holdingName: string };
 type ProjectOption = { id: number; code: string; name: string; entityId: number };
@@ -21,10 +22,16 @@ export default function AppHeader({ userRole }: { userRole: string }) {
   const [projectId, setProjectId] = useState<number | "">("");
   const [saving, setSaving] = useState(false);
 
-  const isStaff = userRole === "OWNER" || userRole === "MANAGER";
+  const isStaff = isStaffRole(userRole);
+  const canSwitchContext =
+    hasModuleAccess(userRole, "project", "create") ||
+    hasModuleAccess(userRole, "inventory", "create") ||
+    hasModuleAccess(userRole, "billing", "view") ||
+    hasModuleAccess(userRole, "utility", "view") ||
+    hasModuleAccess(userRole, "maintenance", "view");
 
   const loadContext = useCallback(() => {
-    if (!isStaff) return;
+    if (!isStaff || !canSwitchContext) return;
     fetch("/api/organization/context")
       .then((r) => r.json())
       .then((data) => {
@@ -38,7 +45,7 @@ export default function AppHeader({ userRole }: { userRole: string }) {
         }
       })
       .catch(() => {});
-  }, [isStaff]);
+  }, [canSwitchContext, isStaff]);
 
   useEffect(() => {
     loadContext();
@@ -85,7 +92,7 @@ export default function AppHeader({ userRole }: { userRole: string }) {
     }
   };
 
-  if (!isStaff) return null;
+  if (!isStaff || !canSwitchContext) return null;
 
   const filteredProjects = projects.filter((p) => !entityId || p.entityId === entityId);
 

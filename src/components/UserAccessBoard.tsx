@@ -21,9 +21,15 @@ export default function UserAccessBoard() {
   } | null>(null);
 
   const loadBase = useCallback(() => {
-    fetch("/api/users?role=MANAGER")
+    fetch("/api/users")
       .then((r) => r.json())
-      .then((data) => setUsers(Array.isArray(data) ? data : []));
+      .then((data) =>
+        setUsers(
+          Array.isArray(data)
+            ? data.filter((user) => user.role !== "TENANT")
+            : []
+        )
+      );
     fetch("/api/organization/context")
       .then((r) => r.json())
       .then((data) => {
@@ -74,7 +80,7 @@ export default function UserAccessBoard() {
       <CardBody>
         <PageHeader
           title="Akses Entity & Project"
-          description="Atur manager/pengelola yang hanya boleh mengakses entity atau project tertentu. OWNER otomatis akses penuh."
+          description="Atur scope entity dan project untuk staff. Super Admin otomatis akses penuh ke semua data."
         />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
           <Select label="Pengelola" value={selectedUser} onChange={(e) => setSelectedUser(e.target.value)}>
@@ -96,7 +102,7 @@ export default function UserAccessBoard() {
                 <li key={a.project.id}>Project: {a.project.code} — {a.project.name}</li>
               ))}
               {access.entityAccess.length === 0 && access.projectAccess.length === 0 && (
-                <li>Belum ada akses khusus (hanya OWNER yang full access)</li>
+                <li>Belum ada akses khusus untuk user ini</li>
               )}
             </ul>
           </div>

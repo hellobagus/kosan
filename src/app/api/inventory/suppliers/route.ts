@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getSession } from "@/lib/auth";
+import { requireStaffModule } from "@/lib/api-auth";
 
 export async function GET() {
   try {
+    const auth = await requireStaffModule("inventory", "view");
+    if ("error" in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
+
     const suppliers = await prisma.supplier.findMany({
       include: { _count: { select: { purchases: true } } },
       orderBy: { name: "asc" },
@@ -17,8 +22,10 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getSession();
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireStaffModule("inventory", "create");
+    if ("error" in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
 
     const { name, phone, email, address, active } = await request.json();
     if (!name) return NextResponse.json({ error: "Nama supplier wajib diisi" }, { status: 400 });
@@ -35,8 +42,10 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    const session = await getSession();
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireStaffModule("inventory", "create");
+    if ("error" in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
 
     const { id, name, phone, email, address, active } = await request.json();
     if (!id || !name) return NextResponse.json({ error: "Data wajib belum lengkap" }, { status: 400 });
@@ -54,8 +63,10 @@ export async function PUT(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const session = await getSession();
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await requireStaffModule("inventory", "full");
+    if ("error" in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
 
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");

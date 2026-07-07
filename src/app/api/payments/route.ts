@@ -10,6 +10,7 @@ import {
   recordManualPayment,
 } from "@/lib/payment-service";
 import { prisma } from "@/lib/prisma";
+import { hasModuleAccess } from "@/lib/rbac";
 
 export async function POST(request: NextRequest) {
   try {
@@ -28,13 +29,35 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Nominal pembayaran tidak valid" }, { status: 400 });
     }
 
+    const tenantRecord = await prisma.tenant.findUnique({
+      where: { id: parseInt(tenantId) },
+      select: { id: true, userId: true },
+    });
+    if (!tenantRecord) {
+      return NextResponse.json({ error: "Penghuni tidak ditemukan" }, { status: 404 });
+    }
+
+    const canManagePayments = hasModuleAccess(session.role, "payment", "create");
+    const isTenantSelf = session.role === "TENANT" && tenantRecord.userId === session.userId;
+    if (!canManagePayments && !isTenantSelf) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    if (isTenantSelf && method === "CASH") {
+      return NextResponse.json(
+        { error: "Penghuni tidak dapat mencatat pembayaran tunai. Gunakan Transfer atau Midtrans." },
+        { status: 403 }
+      );
+    }
+
     if (method === "CASH" || method === "TRANSFER") {
       const result = await recordManualPayment({
-        tenantId: parseInt(tenantId),
+        tenantId: tenantRecord.id,
         amount: parsedAmount,
         method,
         notes: notes || undefined,
         createdBy: session.userId,
+        createdByName: session.name,
       });
       return NextResponse.json({
         success: true,
@@ -52,10 +75,11 @@ export async function POST(request: NextRequest) {
       }
 
       const { payment, tenant, orderId } = await createMidtransPayment({
-        tenantId: parseInt(tenantId),
+        tenantId: tenantRecord.id,
         amount: parsedAmount,
         notes: notes || undefined,
         createdBy: session.userId,
+        createdByName: session.name,
       });
 
       const snapToken = await createMidtransSnapToken({
@@ -99,10 +123,19 @@ export async function GET(request: NextRequest) {
         include: { tenant: { include: { user: true, room: true } } },
       });
       if (!payment) return NextResponse.json({ error: "Pembayaran tidak ditemukan" }, { status: 404 });
+      if (session.role === "TENANT" && payment.tenant.userId !== session.userId) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
       return NextResponse.json(payment);
     }
 
     if (tenantId) {
+      const tenantFilter =
+        session.role === "TENANT"
+          ? { id: parseInt(tenantId), userId: session.userId }
+          : { id: parseInt(tenantId) };
+      const tenant = await prisma.tenant.findFirst({ where: tenantFilter, select: { id: true } });
+      if (!tenant) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       const payments = await prisma.payment.findMany({
         where: { tenantId: parseInt(tenantId) },
         orderBy: { createdAt: "desc" },
