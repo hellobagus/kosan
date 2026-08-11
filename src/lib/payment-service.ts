@@ -1,5 +1,6 @@
 import { PaymentMethod, PaymentRecordStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { createFinanceRecord } from "@/lib/accounting-service";
 import { parseAmount } from "@/lib/tenant-utils";
 import { allocateUtilityPayment } from "@/lib/utility-invoice-service";
 
@@ -82,36 +83,32 @@ export async function applySuccessfulPayment(
   const rentPaid = Math.max(0, params.amount - utilityPaid);
 
   if (rentPaid > 0) {
-    await tx.finance.create({
-      data: {
-        type: "INCOME",
-        amount: rentPaid,
-        description: `Pembayaran ${getPaymentMethodLabel(params.method)} - ${tenant.user.name} (Kamar ${tenant.room.roomNumber})`,
-        category: "Sewa",
-        transactionDate: new Date(),
-        tenantId: params.tenantId,
-        roomId: tenant.roomId,
-        createdBy: params.createdBy ?? null,
-        createdByName: params.createdByName ?? null,
-        updatedByName: params.createdByName ?? null,
-      },
+    await createFinanceRecord(tx, {
+      type: "INCOME",
+      amount: rentPaid,
+      description: `Pembayaran ${getPaymentMethodLabel(params.method)} - ${tenant.user.name} (Kamar ${tenant.room.roomNumber})`,
+      category: "Sewa",
+      transactionDate: new Date(),
+      tenantId: params.tenantId,
+      roomId: tenant.roomId,
+      createdBy: params.createdBy ?? null,
+      createdByName: params.createdByName ?? null,
+      updatedByName: params.createdByName ?? null,
     });
   }
 
   for (const alloc of allocations) {
-    await tx.finance.create({
-      data: {
-        type: "INCOME",
-        amount: alloc.amount,
-        description: `Pembayaran ${alloc.category} - ${tenant.user.name} (Kamar ${tenant.room.roomNumber})`,
-        category: alloc.category,
-        transactionDate: new Date(),
-        tenantId: params.tenantId,
-        roomId: tenant.roomId,
-        createdBy: params.createdBy ?? null,
-        createdByName: params.createdByName ?? null,
-        updatedByName: params.createdByName ?? null,
-      },
+    await createFinanceRecord(tx, {
+      type: "INCOME",
+      amount: alloc.amount,
+      description: `Pembayaran ${alloc.category} - ${tenant.user.name} (Kamar ${tenant.room.roomNumber})`,
+      category: alloc.category,
+      transactionDate: new Date(),
+      tenantId: params.tenantId,
+      roomId: tenant.roomId,
+      createdBy: params.createdBy ?? null,
+      createdByName: params.createdByName ?? null,
+      updatedByName: params.createdByName ?? null,
     });
   }
 

@@ -21,6 +21,7 @@ import {
   User,
   Bell,
   Wrench,
+  BookOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCallback, useEffect, useState } from "react";
@@ -47,6 +48,7 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   User,
   Bell,
   Wrench,
+  BookOpen,
 };
 
 function resolveIcon(name?: string | null) {

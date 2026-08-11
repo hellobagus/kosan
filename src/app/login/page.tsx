@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Building2, Eye, EyeOff } from "lucide-react";
 import { LOGIN_DEMO_ACCOUNTS } from "@/lib/demo-accounts";
 
@@ -99,6 +100,12 @@ export default function LoginPage() {
             <div className="mb-8">
               <h2 className="text-2xl font-bold text-slate-900">Selamat Datang</h2>
               <p className="text-slate-500 mt-1">Masuk ke akun Anda untuk melanjutkan</p>
+              <p className="text-sm text-slate-500 mt-2">
+                Calon penghuni?{" "}
+                <Link href="/" className="font-medium text-teal-700 hover:text-teal-800">
+                  Lihat info & daftar kamar
+                </Link>
+              </p>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-5">

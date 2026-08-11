@@ -1,4 +1,4 @@
-export const EXTRA_OCCUPANT_FEE = 200_000;
+export const EXTRA_OCCUPANT_FEE = 500_000;
 export const LATE_PENALTY_PER_DAY = 50_000;
 
 export const LEASE_OPTIONS = [

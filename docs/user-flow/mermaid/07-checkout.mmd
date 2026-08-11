@@ -1,0 +1,18 @@
+flowchart TD
+  start["Mulai checkout<br/>Status: Menunggu Checkout<br/><i>Front Office</i>"]
+  inspect["Inspeksi inventaris<br/><i>Maintenance</i>"]
+  deposit["Hitung potongan deposit<br/>Jika ada kerusakan<br/><i>Finance</i>"]
+  done["Selesaikan checkout<br/>Status: Selesai<br/><i>Front Office</i>"]
+  empty["Kamar kosong lagi<br/><i>Sistem</i>"]
+
+  start --> inspect --> deposit --> done --> empty
+
+  classDef fo fill:#0f766e,stroke:#0f766e,color:#fff
+  classDef maint fill:#d75c4e,stroke:#d75c4e,color:#fff
+  classDef finance fill:#1f8a65,stroke:#1f8a65,color:#fff
+  classDef system fill:#e2e8f0,stroke:#94a3b8,color:#0f172a
+
+  class start,done fo
+  class inspect maint
+  class deposit finance
+  class empty system

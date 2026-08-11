@@ -6,7 +6,7 @@ import Link from "next/link";
 import {
   BedDouble,
   Building2,
-  Layers,
+  Palette,
   Pencil,
   Plus,
   Trash2,
@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { Button, Card, CardBody, EmptyState, Input, Select, Textarea } from "@/components/ui";
 import { cn } from "@/lib/utils";
+import { resolveRoomZone, type RoomZone } from "@/lib/room-zones";
 import RoomInventoryFields, {
   EMPTY_ROOM_INVENTORY,
   getRoomInventoryTexts,
@@ -33,6 +34,12 @@ interface Room {
   status: "AVAILABLE" | "OCCUPIED" | "MAINTENANCE";
   tenants: Array<{ user: { name: string } }>;
   template?: { id: number; name: string } | null;
+  floorRef?: {
+    id: number;
+    name: string;
+    level: number;
+    building?: { id: number; name: string; code: string } | null;
+  } | null;
 }
 
 function parseList(text: string | null): string[] {
@@ -46,12 +53,20 @@ function formatPriceShort(amount: string | number | null): string {
   return `Rp.${num.toLocaleString("id-ID")},-`;
 }
 
+function roomZone(room: Room): RoomZone {
+  return resolveRoomZone({
+    floorName: room.floorRef?.name,
+    floorLevel: room.floorRef?.level ?? room.floor,
+    roomNumber: room.roomNumber,
+  });
+}
+
 export default function RoomBoard() {
   const refreshKey = useProjectRefreshKey();
   const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<number | null>(null);
-  const [floorFilter, setFloorFilter] = useState<number | "all">("all");
+  const [colorFilter, setColorFilter] = useState<string | "all">("all");
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [inventoryItems, setInventoryItems] = useState<InventoryItemOption[]>([]);
@@ -92,17 +107,28 @@ export default function RoomBoard() {
       .catch(() => {});
   }, [fetchRooms, refreshKey]);
 
-  const floors = useMemo(
-    () => [...new Set(rooms.map((r) => r.floor))].sort((a, b) => a - b),
-    [rooms]
-  );
+  const colorOptions = useMemo(() => {
+    const map = new Map<string, { key: string; label: string; zone: RoomZone; floorLevel: number }>();
+    for (const room of rooms) {
+      const zone = roomZone(room);
+      if (!map.has(zone.key)) {
+        map.set(zone.key, {
+          key: zone.key,
+          label: zone.label,
+          zone,
+          floorLevel: room.floorRef?.level ?? room.floor,
+        });
+      }
+    }
+    return [...map.values()].sort((a, b) => a.floorLevel - b.floorLevel);
+  }, [rooms]);
 
   const filteredRooms = useMemo(
     () =>
-      floorFilter === "all"
+      colorFilter === "all"
         ? rooms
-        : rooms.filter((r) => r.floor === floorFilter),
-    [rooms, floorFilter]
+        : rooms.filter((r) => roomZone(r).key === colorFilter),
+    [rooms, colorFilter]
   );
 
   const stats = useMemo(
@@ -115,6 +141,7 @@ export default function RoomBoard() {
   );
 
   const selected = rooms.find((r) => r.id === selectedId) ?? filteredRooms[0] ?? null;
+  const selectedZone = selected ? roomZone(selected) : null;
 
   useEffect(() => {
     if (filteredRooms.length > 0 && !filteredRooms.find((r) => r.id === selectedId)) {
@@ -241,7 +268,6 @@ export default function RoomBoard() {
 
   return (
     <div className="space-y-4">
-      {/* Top bar */}
       <div className="flex flex-col lg:flex-row lg:items-center gap-4">
         <Link href="/kamar/baru">
           <button className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg border-2 border-blue-500 text-blue-600 font-semibold hover:bg-blue-50 transition-colors">
@@ -270,78 +296,91 @@ export default function RoomBoard() {
         </div>
       </div>
 
-      {/* Floor filter */}
       <Card>
         <CardBody className="py-3">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-sm text-slate-500 mr-2 flex items-center gap-1.5">
-              <Layers className="w-4 h-4" />
-              Lantai:
+              <Palette className="w-4 h-4" />
+              Colour:
             </span>
             <button
-              onClick={() => setFloorFilter("all")}
+              onClick={() => setColorFilter("all")}
               className={cn(
                 "inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium border transition-colors",
-                floorFilter === "all"
-                  ? "bg-blue-600 text-white border-blue-600"
-                  : "bg-white text-slate-600 border-slate-200 hover:border-blue-300"
+                colorFilter === "all"
+                  ? "bg-slate-800 text-white border-slate-800"
+                  : "bg-white text-slate-600 border-slate-200 hover:border-slate-400"
               )}
             >
               <Building2 className="w-4 h-4" />
               Semua
             </button>
-            {floors.map((floor) => (
+            {colorOptions.map((opt) => (
               <button
-                key={floor}
-                onClick={() => setFloorFilter(floor)}
+                key={opt.key}
+                onClick={() => setColorFilter(opt.key)}
                 className={cn(
                   "inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium border transition-colors",
-                  floorFilter === floor
-                    ? "bg-blue-600 text-white border-blue-600"
-                    : "bg-white text-slate-600 border-slate-200 hover:border-blue-300"
+                  colorFilter === opt.key ? opt.zone.chipActive : opt.zone.chipIdle
                 )}
+                style={
+                  colorFilter === opt.key
+                    ? { backgroundColor: opt.zone.hex, borderColor: opt.zone.hex }
+                    : undefined
+                }
               >
-                <Layers className="w-4 h-4" />
-                Lantai {floor}
+                <span
+                  className="w-3 h-3 rounded-full border border-white/40 shadow-sm"
+                  style={{ backgroundColor: opt.zone.hex }}
+                />
+                {opt.label}
               </button>
             ))}
           </div>
         </CardBody>
       </Card>
 
-      {/* Room tabs */}
       <Card>
         <CardBody className="py-4">
           <div className="flex gap-2 overflow-x-auto pb-1">
             {filteredRooms.map((room) => {
               const active = room.id === selected?.id;
-              const vacant = room.status === "AVAILABLE";
+              const zone = roomZone(room);
               const occupied = room.status === "OCCUPIED";
+              const maintenance = room.status === "MAINTENANCE";
               return (
                 <button
                   key={room.id}
                   onClick={() => setSelectedId(room.id)}
+                  title={`${room.roomNumber} · ${zone.label}${occupied ? " · Terisi" : maintenance ? " · Perbaikan" : " · Kosong"}`}
                   className={cn(
-                    "flex flex-col items-center gap-1 min-w-[72px] px-4 py-3 rounded-lg border-2 transition-all shrink-0",
-                    active
-                      ? "border-blue-500 bg-blue-50"
-                      : "border-transparent bg-slate-50 hover:bg-slate-100"
+                    "relative flex flex-col items-center gap-1.5 min-w-[80px] px-3 py-3 rounded-xl border-2 transition-all shrink-0",
+                    zone.cardBorder,
+                    active ? zone.cardBgActive : zone.cardBg,
+                    active && "shadow-md ring-2 ring-offset-1",
+                    !active && "hover:brightness-95"
                   )}
+                  style={
+                    active
+                      ? ({ ["--tw-ring-color" as string]: zone.hex } as React.CSSProperties)
+                      : undefined
+                  }
                 >
-                  <BedDouble
-                    className={cn(
-                      "w-7 h-7",
-                      active ? "text-blue-600" : vacant ? "text-emerald-500" : occupied ? "text-red-500" : "text-amber-500"
-                    )}
-                  />
                   <span
-                    className={cn(
-                      "text-lg font-bold",
-                      active ? "text-blue-600" : vacant ? "text-emerald-600" : occupied ? "text-red-600" : "text-amber-600"
-                    )}
+                    className="w-11 h-11 rounded-xl flex items-center justify-center shadow-sm"
+                    style={{ backgroundColor: zone.hex }}
                   >
+                    <BedDouble className="w-6 h-6 text-white" />
+                  </span>
+                  <span className={cn("text-base font-bold", zone.text)}>
                     {room.roomNumber}
                   </span>
+                  {occupied && (
+                    <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full bg-red-500 border border-white" title="Terisi" />
+                  )}
+                  {maintenance && (
+                    <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full bg-amber-500 border border-white" title="Perbaikan" />
+                  )}
                 </button>
               );
             })}
@@ -349,18 +388,14 @@ export default function RoomBoard() {
         </CardBody>
       </Card>
 
-      {/* Room detail */}
-      {selected && (
+      {selected && selectedZone && (
         <Card>
           <CardBody className="p-0">
-            {/* Header */}
             <div className="flex items-start justify-between p-6 border-b border-slate-100">
               <div className="flex items-center gap-4">
                 <div
-                  className={cn(
-                    "w-16 h-16 rounded-lg flex items-center justify-center text-2xl font-bold text-white",
-                    isAvailable ? "bg-emerald-500" : isOccupied ? "bg-red-500" : "bg-amber-500"
-                  )}
+                  className="w-16 h-16 rounded-xl flex items-center justify-center text-2xl font-bold text-white shadow-sm"
+                  style={{ backgroundColor: selectedZone.hex }}
                 >
                   {selected.roomNumber}
                 </div>
@@ -380,7 +415,13 @@ export default function RoomBoard() {
                   {tenantName && (
                     <p className="text-sm text-slate-500 mt-1">Penghuni: {tenantName}</p>
                   )}
-                  <p className="text-xs text-slate-400 mt-0.5">Lantai {selected.floor}</p>
+                  <p className={cn("text-xs mt-1 font-semibold flex items-center gap-1.5", selectedZone.text)}>
+                    <span
+                      className="w-3 h-3 rounded-full border border-black/5"
+                      style={{ backgroundColor: selectedZone.hex }}
+                    />
+                    {selectedZone.label}
+                  </p>
                 </div>
               </div>
               <div className="flex gap-2">
@@ -399,7 +440,6 @@ export default function RoomBoard() {
               </div>
             </div>
 
-            {/* Pricing */}
             <div className="px-6 py-5 border-b border-slate-100">
               <div className="flex flex-wrap items-end gap-6">
                 <div>
@@ -420,7 +460,6 @@ export default function RoomBoard() {
               </div>
             </div>
 
-            {/* Facilities grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-100">
               <div className="p-6">
                 <h3 className="font-bold text-slate-800 mb-1">Fasilitas Kamar</h3>
@@ -455,7 +494,6 @@ export default function RoomBoard() {
               </div>
             </div>
 
-            {/* Notes */}
             <div className="px-6 py-5 border-t border-slate-100 bg-slate-50/50">
               <h3 className="font-bold text-slate-800">
                 Catatan Kamar:{" "}
@@ -471,7 +509,6 @@ export default function RoomBoard() {
         </Card>
       )}
 
-      {/* Edit modal */}
       {editing && selected && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -484,9 +521,11 @@ export default function RoomBoard() {
             <div className="p-6 space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <Input label="No. Kamar" value={editForm.roomNumber} onChange={(e) => setEditForm({ ...editForm, roomNumber: e.target.value })} />
-                <Select label="Lantai" value={editForm.floor} onChange={(e) => setEditForm({ ...editForm, floor: e.target.value })}>
-                  {[1, 2, 3, 4, 5].map((f) => (
-                    <option key={f} value={f}>Lantai {f}</option>
+                <Select label="Colour / Zone" value={editForm.floor} onChange={(e) => setEditForm({ ...editForm, floor: e.target.value })}>
+                  {colorOptions.map((opt) => (
+                    <option key={opt.key} value={opt.floorLevel}>
+                      {opt.label}
+                    </option>
                   ))}
                 </Select>
               </div>

@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>KosanKu — User Flow Presentasi Client</title>
+  <script type="module">
+    import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: "base",
+      securityLevel: "loose",
+      flowchart: { curve: "basis", htmlLabels: true, padding: 12 },
+      themeVariables: {
+        fontFamily: "Segoe UI, Helvetica Neue, Arial, sans-serif",
+        fontSize: "14px",
+        primaryColor: "#f1f5f9",
+        primaryTextColor: "#0f172a",
+        primaryBorderColor: "#64748b",
+        lineColor: "#475569",
+        secondaryColor: "#e2e8f0",
+        tertiaryColor: "#fff",
+      },
+    });
+    window.__mermaidReady = mermaid
+      .run({ querySelector: ".mermaid" })
+      .then(() => {
+        document.documentElement.dataset.mermaid = "ready";
+      })
+      .catch((err) => {
+        console.error(err);
+        document.documentElement.dataset.mermaid = "error";
+      });
+  </script>
+  <style>
+    :root {
+      --ink: #0f172a;
+      --muted: #475569;
+      --line: #e2e8f0;
+      --teal: #0f766e;
+      --bg: #ffffff;
+      --soft: #f8fafc;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--bg);
+      font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+      line-height: 1.45;
+    }
+    .page {
+      max-width: 920px;
+      margin: 0 auto;
+      padding: 36px 40px 48px;
+    }
+    h1 {
+      font-size: 28px;
+      margin: 0 0 8px;
+      letter-spacing: -0.02em;
+    }
+    h2 {
+      font-size: 18px;
+      margin: 0 0 6px;
+      color: var(--teal);
+    }
+    .lead {
+      color: var(--muted);
+      margin: 0 0 20px;
+      font-size: 14px;
+    }
+    .meta {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .stat {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px 14px;
+      background: var(--soft);
+    }
+    .stat strong {
+      display: block;
+      font-size: 22px;
+      line-height: 1.1;
+    }
+    .stat span {
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .callout {
+      border-left: 3px solid var(--teal);
+      background: #f0fdfa;
+      padding: 12px 14px;
+      margin-bottom: 28px;
+      font-size: 13px;
+    }
+    .section {
+      break-inside: avoid;
+      page-break-inside: avoid;
+      margin-bottom: 32px;
+      padding-top: 8px;
+      border-top: 1px solid var(--line);
+    }
+    .section:first-of-type { border-top: 0; }
+    .subtitle {
+      color: var(--muted);
+      font-size: 13px;
+      margin: 0 0 12px;
+    }
+    .mermaid {
+      display: flex;
+      justify-content: center;
+      background: var(--soft);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 16px 8px;
+      overflow: hidden;
+    }
+    .mermaid svg { max-width: 100%; height: auto; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      margin-top: 8px;
+    }
+    th, td {
+      border: 1px solid var(--line);
+      padding: 8px 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th { background: var(--soft); }
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 16px;
+      margin: 10px 0 18px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .swatch {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 2px;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+    .footer {
+      margin-top: 24px;
+      font-size: 11px;
+      color: #94a3b8;
+      border-top: 1px solid var(--line);
+      padding-top: 12px;
+    }
+    @page {
+      size: A4;
+      margin: 12mm 10mm;
+    }
+    @media print {
+      .page { padding: 0; max-width: none; }
+      .section { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <h1>KosanKu — User Flow</h1>
+    <p class="lead">
+      Flowchart operasional untuk presentasi client: multi-project, role-based,
+      portal publik, onboarding kontrak, billing, dan layanan penghuni.
+    </p>
+
+    <div class="meta">
+      <div class="stat"><strong>2</strong><span>Tampilan utama</span></div>
+      <div class="stat"><strong>7</strong><span>Peran pengguna</span></div>
+      <div class="stat"><strong>6</strong><span>Alur operasional</span></div>
+      <div class="stat"><strong>1</strong><span>Siklus kamar penuh</span></div>
+    </div>
+
+    <div class="callout">
+      <strong>Dua pintu masuk.</strong>
+      Publik &amp; calon: landing → katalog → daftar online.
+      Staf: Dashboard. Penghuni: Portal (tagihan, perbaikan, pindah kamar).
+    </div>
+
+    <div class="legend">
+      <span><i class="swatch" style="background:#e8eef5;border:1px solid #64748b"></i>Calon / Publik</span>
+      <span><i class="swatch" style="background:#0f766e"></i>Front Office</span>
+      <span><i class="swatch" style="background:#1f8a65"></i>Finance</span>
+      <span><i class="swatch" style="background:#d75c4e"></i>Maintenance</span>
+      <span><i class="swatch" style="background:#3685bf"></i>Penghuni</span>
+      <span><i class="swatch" style="background:#7754d9"></i>Admin</span>
+      <span><i class="swatch" style="background:#e2e8f0;border:1px solid #94a3b8"></i>Sistem</span>
+    </div>
+
+    <section class="section">
+      <h2>1. Big Picture — Siklus Hunian</h2>
+      <p class="subtitle">Dari calon melihat kamar online sampai check-out dan kamar kembali kosong.</p>
+      <pre class="mermaid">
+flowchart TD
+  landing["Landing & katalog kamar<br/><i>Calon / Publik</i>"]
+  apply["Form daftar online<br/><i>Calon / Publik</i>"]
+  verify["Verifikasi calon<br/><i>Front Office</i>"]
+  contract["Kontrak & BA inventaris<br/><i>Front Office</i>"]
+  checkin["Check-in aktif<br/><i>Front Office</i>"]
+  live["Huni + portal penghuni<br/><i>Penghuni</i>"]
+  pay["Tagihan & pembayaran<br/><i>Finance</i>"]
+  svc["Perbaikan / pindah<br/><i>Maintenance</i>"]
+  out["Checkout & kamar kosong<br/><i>Front Office</i>"]
+
+  landing --> apply --> verify --> contract --> checkin --> live
+  live --> pay --> out
+  live --> svc --> out
+
+  classDef public fill:#e8eef5,stroke:#64748b,color:#0f172a
+  classDef fo fill:#0f766e,stroke:#0f766e,color:#fff
+  classDef finance fill:#1f8a65,stroke:#1f8a65,color:#fff
+  classDef maint fill:#d75c4e,stroke:#d75c4e,color:#fff
+  classDef tenant fill:#3685bf,stroke:#3685bf,color:#fff
+
+  class landing,apply public
+  class verify,contract,checkin,out fo
+  class pay finance
+  class svc maint
+  class live tenant
+      </pre>
+    </section>
+
+    <section class="section">
+      <h2>2. Setup Awal (Go-Live)</h2>
+      <p class="subtitle">Persiapan Super Admin sebelum operasional harian berjalan.</p>
+      <pre class="mermaid">
+flowchart TD
+  org["Struktur organisasi<br/>Holding → Entity → Project<br/><i>Admin / Manager</i>"]
+  profile["Profil kosan & paket sewa<br/>Denda, grace period<br/><i>Admin / Manager</i>"]
+  rooms["Master kamar & inventaris<br/><i>Admin / Manager</i>"]
+  users["Akun staf & hak akses<br/><i>Admin / Manager</i>"]
+  coa["Akun keuangan / periode<br/><i>Finance</i>"]
+  ready["Siap operasional<br/><i>Sistem</i>"]
+
+  org --> profile --> rooms --> users --> coa --> ready
+
+  classDef admin fill:#7754d9,stroke:#7754d9,color:#fff
+  classDef finance fill:#1f8a65,stroke:#1f8a65,color:#fff
+  classDef system fill:#e2e8f0,stroke:#94a3b8,color:#0f172a
+
+  class org,profile,rooms,users admin
+  class coa finance
+  class ready system
+      </pre>
+    </section>
+
+    <section class="section">
+      <h2>3. Onboarding Penghuni (Kontrak)</h2>
+      <p class="subtitle">Dari calon menunggu verifikasi hingga status Aktif dan kamar Terisi.</p>
+      <pre class="mermaid">
+flowchart TD
+  input["Input calon / daftar online<br/>Status: Menunggu Verifikasi<br/><i>Calon / Publik</i>"]
+  approve{"Setujui atau tolak?<br/><i>Front Office</i>"}
+  reject["Tolak / batalkan data"]
+  send["Kirim kontrak PDF<br/>Status: Kontrak Terkirim<br/><i>Sistem</i>"]
+  sign["TTD manual + unggah scan<br/>Status: Kontrak Ditandatangani<br/><i>Front Office</i>"]
+  ba["Generate BA inventaris<br/><i>Front Office</i>"]
+  active["Check-in → Aktif<br/>Kamar Terisi<br/><i>Front Office</i>"]
+
+  input --> approve
+  approve -->|Tolak| reject
+  approve -->|Setuju| send
+  send --> sign --> ba --> active
+
+  classDef public fill:#e8eef5,stroke:#64748b,color:#0f172a
+  classDef fo fill:#0f766e,stroke:#0f766e,color:#fff
+  classDef system fill:#e2e8f0,stroke:#94a3b8,color:#0f172a
+  classDef reject fill:#fef2f2,stroke:#cf2d56,color:#7f1d1d
+
+  class input public
+  class approve,sign,ba,active fo
+  class send system
+  class reject reject
+      </pre>
+    </section>
+
+    <section class="section">
+      <h2>4. Tagihan &amp; Pembayaran</h2>
+      <p class="subtitle">Finance mengelola billing; penghuni bayar lewat portal.</p>
+      <pre class="mermaid">
+flowchart TD
+  gen["Generate / catat tagihan<br/>Sewa, utilitas, denda<br/><i>Finance</i>"]
+  notify["Tagihan muncul di portal<br/><i>Sistem</i>"]
+  pay["Penghuni bayar<br/>Transfer / Midtrans<br/><i>Penghuni</i>"]
+  confirm["Konfirmasi / catat pembayaran<br/><i>Finance</i>"]
+  ledger["Jurnal & laporan keuangan<br/>Akuntansi otomatis<br/><i>Sistem</i>"]
+  invoice["Invoice tersedia<br/><i>Penghuni</i>"]
+
+  gen --> notify --> pay --> confirm --> ledger --> invoice
+
+  classDef finance fill:#1f8a65,stroke:#1f8a65,color:#fff
+  classDef system fill:#e2e8f0,stroke:#94a3b8,color:#0f172a
+  classDef tenant fill:#3685bf,stroke:#3685bf,color:#fff
+
+  class gen,confirm finance
+  class notify,ledger system
+  class pay,invoice tenant
+      </pre>
+    </section>
+
+    <section class="section">
+      <h2>5. Permintaan Perbaikan</h2>
+      <p class="subtitle">Ticket dari portal penghuni ditangani Front Office / Maintenance.</p>
+      <pre class="mermaid">
+flowchart TD
+  create["Lapor kerusakan di portal<br/>AC, listrik, plumbing, dll.<br/><i>Penghuni</i>"]
+  triage["Terima / assign tiket<br/><i>Front Office</i>"]
+  fix["Perbaikan di lokasi<br/><i>Maintenance</i>"]
+  close["Tutup tiket<br/><i>Maintenance</i>"]
+  view["Status terlihat di portal<br/><i>Penghuni</i>"]
+
+  create --> triage --> fix --> close --> view
+
+  classDef tenant fill:#3685bf,stroke:#3685bf,color:#fff
+  classDef fo fill:#0f766e,stroke:#0f766e,color:#fff
+  classDef maint fill:#d75c4e,stroke:#d75c4e,color:#fff
+
+  class create,view tenant
+  class triage fo
+  class fix,close maint
+      </pre>
+    </section>
+
+    <section class="section">
+      <h2>6. Pindah Kamar</h2>
+      <p class="subtitle">Pengajuan portal → persetujuan → serah terima kamar lama ke baru.</p>
+      <pre class="mermaid">
+flowchart TD
+  req["Ajukan pindah di portal<br/><i>Penghuni</i>"]
+  ok["Persetujuan staf<br/><i>Front Office</i>"]
+  diff["Hitung selisih sewa/deposit<br/><i>Finance</i>"]
+  letter["Surat pindah<br/><i>Front Office</i>"]
+  old["Inspeksi kamar lama + closing meter<br/><i>Maintenance</i>"]
+  new["Serah terima kamar baru<br/><i>Front Office</i>"]
+  bill["Update kontrak & billing<br/><i>Sistem</i>"]
+
+  req --> ok --> diff --> letter --> old --> new --> bill
+
+  classDef tenant fill:#3685bf,stroke:#3685bf,color:#fff
+  classDef fo fill:#0f766e,stroke:#0f766e,color:#fff
+  classDef finance fill:#1f8a65,stroke:#1f8a65,color:#fff
+  classDef maint fill:#d75c4e,stroke:#d75c4e,color:#fff
+  classDef system fill:#e2e8f0,stroke:#94a3b8,color:#0f172a
+
+  class req tenant
+  class ok,letter,new fo
+  class diff finance
+  class old maint
+  class bill system
+      </pre>
+    </section>
+
+    <section class="section">
+      <h2>7. Checkout Penghuni</h2>
+      <p class="subtitle">Inspeksi inventaris, potongan deposit, kamar kembali kosong.</p>
+      <pre class="mermaid">
+flowchart TD
+  start["Mulai checkout<br/>Status: Menunggu Checkout<br/><i>Front Office</i>"]
+  inspect["Inspeksi inventaris<br/><i>Maintenance</i>"]
+  deposit["Hitung potongan deposit<br/>Jika ada kerusakan<br/><i>Finance</i>"]
+  done["Selesaikan checkout<br/>Status: Selesai<br/><i>Front Office</i>"]
+  empty["Kamar kosong lagi<br/><i>Sistem</i>"]
+
+  start --> inspect --> deposit --> done --> empty
+
+  classDef fo fill:#0f766e,stroke:#0f766e,color:#fff
+  classDef maint fill:#d75c4e,stroke:#d75c4e,color:#fff
+  classDef finance fill:#1f8a65,stroke:#1f8a65,color:#fff
+  classDef system fill:#e2e8f0,stroke:#94a3b8,color:#0f172a
+
+  class start,done fo
+  class inspect maint
+  class deposit finance
+  class empty system
+      </pre>
+    </section>
+
+    <section class="section">
+      <h2>Matriks peran</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Peran</th>
+            <th>Fokus</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Super Admin / Manager</td><td>Organisasi, setup, override, laporan</td></tr>
+          <tr><td>Front Office</td><td>Calon, kontrak, check-in/out, tiket</td></tr>
+          <tr><td>Finance</td><td>Tagihan, pembayaran, jurnal, laporan keuangan</td></tr>
+          <tr><td>Maintenance</td><td>Inventaris, utilitas, inspeksi, perbaikan</td></tr>
+          <tr><td>Penghuni</td><td>Portal: bayar, pindah, lapor rusak</td></tr>
+          <tr><td>Calon (Publik)</td><td>Katalog kamar &amp; daftar online</td></tr>
+        </tbody>
+      </table>
+      <p class="subtitle" style="margin-top:16px">
+        <strong>Narasi 60 detik:</strong>
+        Calon melihat kamar di website → daftar → Front Office verifikasi &amp; kontrak →
+        check-in. Saat huni, penghuni bayar dan lapor perbaikan lewat portal; Finance
+        mencatat uang; Maintenance menjaga aset. Saat keluar, inspeksi + deposit → kamar
+        kembali kosong dan siap dijual lagi.
+      </p>
+    </section>
+
+    <p class="footer">
+      KosanKu User Flow · Sumber: konsep aplikasi (panduan pengguna &amp; workflow kontrak) ·
+      Dokumen presentasi client
+    </p>
+  </div>
+</body>
+</html>

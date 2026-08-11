@@ -1,0 +1,23 @@
+flowchart TD
+  input["Input calon / daftar online<br/>Status: Menunggu Verifikasi<br/><i>Calon / Publik</i>"]
+  approve{"Setujui atau tolak?<br/><i>Front Office</i>"}
+  reject["Tolak / batalkan data"]
+  send["Kirim kontrak PDF<br/>Status: Kontrak Terkirim<br/><i>Sistem</i>"]
+  sign["TTD manual + unggah scan<br/>Status: Kontrak Ditandatangani<br/><i>Front Office</i>"]
+  ba["Generate BA inventaris<br/><i>Front Office</i>"]
+  active["Check-in → Aktif<br/>Kamar Terisi<br/><i>Front Office</i>"]
+
+  input --> approve
+  approve -->|Tolak| reject
+  approve -->|Setuju| send
+  send --> sign --> ba --> active
+
+  classDef public fill:#e8eef5,stroke:#64748b,color:#0f172a
+  classDef fo fill:#0f766e,stroke:#0f766e,color:#fff
+  classDef system fill:#e2e8f0,stroke:#94a3b8,color:#0f172a
+  classDef reject fill:#fef2f2,stroke:#cf2d56,color:#7f1d1d
+
+  class input public
+  class approve,sign,ba,active fo
+  class send system
+  class reject reject

@@ -18,6 +18,7 @@ import { requireProjectContext, roomProjectFilter } from "@/lib/project-context"
 import { generateInvoiceNumber } from "@/lib/document-number";
 import { requireStaffModule } from "@/lib/api-auth";
 import { withCreateAudit, withUpdateAudit } from "@/lib/audit";
+import { createFinanceRecord } from "@/lib/accounting-service";
 
 function parseStatusParam(value: string | null): TenantStatus | undefined {
   if (!value) return undefined;
@@ -260,38 +261,34 @@ export async function POST(request: NextRequest) {
       }
 
       if (deposit && parseFloat(deposit) > 0) {
-        await tx.finance.create({
-          data: {
-            type: "INCOME",
-            amount: parseFloat(deposit),
-            description: `Deposit - ${name} (Kamar ${room.roomNumber})`,
-            category: "Deposit",
-            transactionDate: checkInDate,
-            tenantId: t.id,
-            roomId: parseInt(roomId),
-            projectId: auth.context.projectId,
-            createdBy: session.userId,
-            createdByName: session.name,
-            updatedByName: session.name,
-          },
+        await createFinanceRecord(tx, {
+          type: "INCOME",
+          amount: parseFloat(deposit),
+          description: `Deposit - ${name} (Kamar ${room.roomNumber})`,
+          category: "Deposit",
+          transactionDate: checkInDate,
+          tenantId: t.id,
+          roomId: parseInt(roomId),
+          projectId: auth.context.projectId,
+          createdBy: session.userId,
+          createdByName: session.name,
+          updatedByName: session.name,
         });
       }
 
       if (paid > 0) {
-        await tx.finance.create({
-          data: {
-            type: "INCOME",
-            amount: paid,
-            description: `Pembayaran Sewa - ${name} (Kamar ${room.roomNumber})`,
-            category: "Sewa",
-            transactionDate: checkInDate,
-            tenantId: t.id,
-            roomId: parseInt(roomId),
-            projectId: auth.context.projectId,
-            createdBy: session.userId,
-            createdByName: session.name,
-            updatedByName: session.name,
-          },
+        await createFinanceRecord(tx, {
+          type: "INCOME",
+          amount: paid,
+          description: `Pembayaran Sewa - ${name} (Kamar ${room.roomNumber})`,
+          category: "Sewa",
+          transactionDate: checkInDate,
+          tenantId: t.id,
+          roomId: parseInt(roomId),
+          projectId: auth.context.projectId,
+          createdBy: session.userId,
+          createdByName: session.name,
+          updatedByName: session.name,
         });
       }
 

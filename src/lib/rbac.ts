@@ -257,6 +257,10 @@ export function canAccessPath(role: UserRole | string, pathname: string) {
 
 export function getModuleFromPath(pathname: string): ModuleKey | null {
   if (
+    pathname === "/panduan" ||
+    pathname.startsWith("/panduan/")
+  ) return "dashboard";
+  if (
     pathname === "/portal" ||
     pathname.startsWith("/portal/")
   ) {
@@ -346,6 +350,7 @@ export function getApiModule(pathname: string): ModuleKey | null {
   if (pathname.includes("/invoice")) return "billing";
   if (pathname.startsWith("/api/tenants")) return "tenant";
   if (pathname.startsWith("/api/finances")) return "billing";
+  if (pathname.startsWith("/api/accounting")) return "billing";
   if (pathname.startsWith("/api/payments")) return "payment";
   if (pathname.startsWith("/api/room-transfers")) return "tenant";
   if (

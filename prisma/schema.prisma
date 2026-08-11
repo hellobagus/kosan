@@ -156,6 +156,38 @@ enum DocumentType {
   PURCHASE
   TRANSFER_LETTER
   UTILITY_BILL
+  JOURNAL
+}
+
+enum AccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  REVENUE
+  EXPENSE
+}
+
+enum NormalBalance {
+  DEBIT
+  CREDIT
+}
+
+enum JournalStatus {
+  DRAFT
+  POSTED
+  VOID
+}
+
+enum JournalSource {
+  MANUAL
+  FINANCE
+  OPENING
+  ADJUSTMENT
+}
+
+enum PeriodStatus {
+  OPEN
+  CLOSED
 }
 
 model Holding {
@@ -232,6 +264,9 @@ model Project {
   inventoryItems      InventoryItem[]
   purchases           Purchase[]
   finances            Finance[]
+  accounts            Account[]
+  journalEntries      JournalEntry[]
+  accountingPeriods   AccountingPeriod[]
   userAccess          UserProjectAccess[]
   documentSequences   DocumentSequence[]
   announcements       Announcement[]
@@ -597,12 +632,103 @@ model Finance {
   purchases Purchase[]
   assetMaintenances AssetMaintenance[]
   repairRequests    TenantRepairRequest[]
+  journalEntry      JournalEntry?
 
   @@index([projectId])
   @@index([type])
   @@index([transactionDate])
   @@index([type, transactionDate])
   @@map("finances")
+}
+
+model Account {
+  id            Int           @id @default(autoincrement())
+  projectId     Int           @map("project_id")
+  code          String        @db.VarChar(20)
+  name          String        @db.VarChar(150)
+  type          AccountType
+  normalBalance NormalBalance @map("normal_balance")
+  parentId      Int?          @map("parent_id")
+  isSystem      Boolean       @default(false) @map("is_system")
+  isActive      Boolean       @default(true) @map("is_active")
+  sortOrder     Int           @default(0) @map("sort_order")
+  description   String?       @db.VarChar(255)
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  project Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  parent  Account?      @relation("AccountTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children Account[]    @relation("AccountTree")
+  lines   JournalLine[]
+
+  @@unique([projectId, code])
+  @@index([projectId, type])
+  @@index([projectId, isActive])
+  @@map("accounts")
+}
+
+model JournalEntry {
+  id            Int           @id @default(autoincrement())
+  projectId     Int           @map("project_id")
+  entryNumber   String        @map("entry_number") @db.VarChar(60)
+  entryDate     DateTime      @map("entry_date") @db.Date
+  description   String        @db.VarChar(255)
+  status        JournalStatus @default(POSTED)
+  source        JournalSource @default(MANUAL)
+  financeId     Int?          @unique @map("finance_id")
+  reference     String?       @db.VarChar(100)
+  createdBy     Int?          @map("created_by")
+  createdByName String?       @map("created_by_name") @db.VarChar(100)
+  postedAt      DateTime?     @map("posted_at")
+  voidedAt      DateTime?     @map("voided_at")
+  voidReason    String?       @map("void_reason") @db.VarChar(255)
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  project Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  finance Finance?      @relation(fields: [financeId], references: [id], onDelete: SetNull)
+  lines   JournalLine[]
+
+  @@unique([projectId, entryNumber])
+  @@index([projectId, entryDate])
+  @@index([projectId, status])
+  @@index([source])
+  @@map("journal_entries")
+}
+
+model JournalLine {
+  id             Int     @id @default(autoincrement())
+  journalEntryId Int     @map("journal_entry_id")
+  accountId      Int     @map("account_id")
+  debit          Decimal @default(0) @db.Decimal(14, 2)
+  credit         Decimal @default(0) @db.Decimal(14, 2)
+  memo           String? @db.VarChar(255)
+  lineOrder      Int     @default(0) @map("line_order")
+
+  journalEntry JournalEntry @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
+  account      Account      @relation(fields: [accountId], references: [id], onDelete: Restrict)
+
+  @@index([journalEntryId])
+  @@index([accountId])
+  @@map("journal_lines")
+}
+
+model AccountingPeriod {
+  id           Int          @id @default(autoincrement())
+  projectId    Int          @map("project_id")
+  year         Int
+  month        Int
+  status       PeriodStatus @default(OPEN)
+  closedAt     DateTime?    @map("closed_at")
+  closedByName String?      @map("closed_by_name") @db.VarChar(100)
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, year, month])
+  @@index([projectId, status])
+  @@map("accounting_periods")
 }
 
 model Utility {

@@ -23,8 +23,9 @@ export type MenuSeed = {
 
 export const DEFAULT_MENU_TREE: MenuSeed[] = [
   { key: "dashboard", name: "Dashboard", href: "/dashboard", moduleKey: "dashboard", icon: "LayoutDashboard", sortOrder: 1 },
+  { key: "guide", name: "Panduan Penggunaan", href: "/panduan", moduleKey: "dashboard", icon: "BookOpen", sortOrder: 2 },
   {
-    key: "room", name: "Informasi Kamar", moduleKey: "room", icon: "DoorOpen", sortOrder: 2,
+    key: "room", name: "Informasi Kamar", moduleKey: "room", icon: "DoorOpen", sortOrder: 3,
     children: [
       { key: "room.all", name: "Semua Kamar", href: "/kamar", moduleKey: "room", sortOrder: 1 },
       { key: "room.new", name: "Input Kamar Baru", href: "/kamar/baru", moduleKey: "room", sortOrder: 2 },
@@ -33,7 +34,7 @@ export const DEFAULT_MENU_TREE: MenuSeed[] = [
     ],
   },
   {
-    key: "tenant", name: "Penghuni", moduleKey: "tenant", icon: "Users", sortOrder: 3,
+    key: "tenant", name: "Penghuni", moduleKey: "tenant", icon: "Users", sortOrder: 4,
     children: [
       { key: "tenant.active", name: "Penghuni Aktif", href: "/penghuni/aktif", moduleKey: "tenant", sortOrder: 1 },
       { key: "tenant.transfer", name: "Pindah Unit / Kamar", href: "/penghuni/pindah", moduleKey: "tenant", sortOrder: 2 },
@@ -44,15 +45,22 @@ export const DEFAULT_MENU_TREE: MenuSeed[] = [
     ],
   },
   {
-    key: "billing", name: "Keuangan", moduleKey: "billing", icon: "Wallet", sortOrder: 4,
+    key: "billing", name: "Keuangan", moduleKey: "billing", icon: "Wallet", sortOrder: 5,
     children: [
       { key: "billing.summary", name: "Ringkasan", href: "/keuangan", moduleKey: "billing", sortOrder: 1 },
       { key: "billing.income", name: "Pemasukan", href: "/keuangan/pemasukan", moduleKey: "billing", sortOrder: 2 },
       { key: "billing.expense", name: "Pengeluaran", href: "/keuangan/pengeluaran", moduleKey: "billing", sortOrder: 3 },
+      { key: "billing.accounts", name: "Bagan Akun", href: "/keuangan/akun", moduleKey: "billing", sortOrder: 4 },
+      { key: "billing.journal", name: "Jurnal Umum", href: "/keuangan/jurnal", moduleKey: "billing", sortOrder: 5 },
+      { key: "billing.ledger", name: "Buku Besar", href: "/keuangan/buku-besar", moduleKey: "billing", sortOrder: 6 },
+      { key: "billing.trial", name: "Neraca Saldo", href: "/keuangan/neraca-saldo", moduleKey: "billing", sortOrder: 7 },
+      { key: "billing.pnl", name: "Laba Rugi", href: "/keuangan/laba-rugi", moduleKey: "billing", sortOrder: 8 },
+      { key: "billing.balance", name: "Neraca", href: "/keuangan/neraca", moduleKey: "billing", sortOrder: 9 },
+      { key: "billing.period", name: "Periode & Setup", href: "/keuangan/periode", moduleKey: "billing", sortOrder: 10 },
     ],
   },
   {
-    key: "utility", name: "Utilitas", moduleKey: "utility", icon: "Zap", sortOrder: 5,
+    key: "utility", name: "Utilitas", moduleKey: "utility", icon: "Zap", sortOrder: 6,
     children: [
       { key: "utility.list", name: "Daftar Utility", href: "/utilitas", moduleKey: "utility", sortOrder: 1 },
       { key: "utility.room", name: "Utility per Kamar", href: "/utilitas/kamar", moduleKey: "utility", sortOrder: 2 },
@@ -60,7 +68,7 @@ export const DEFAULT_MENU_TREE: MenuSeed[] = [
     ],
   },
   {
-    key: "inventory", name: "Inventaris", moduleKey: "inventory", icon: "Package", sortOrder: 6,
+    key: "inventory", name: "Inventaris", moduleKey: "inventory", icon: "Package", sortOrder: 7,
     children: [
       { key: "inventory.summary", name: "Ringkasan", href: "/inventaris", moduleKey: "inventory", sortOrder: 1 },
       { key: "inventory.items", name: "Master Barang", href: "/inventaris/barang", moduleKey: "inventory", sortOrder: 2 },
@@ -73,9 +81,9 @@ export const DEFAULT_MENU_TREE: MenuSeed[] = [
       { key: "inventory.inspection", name: "Inspeksi Checkout", href: "/inventaris/inspeksi", moduleKey: "maintenance", sortOrder: 9 },
     ],
   },
-  { key: "reporting", name: "Cetak Laporan", href: "/laporan", moduleKey: "reporting", icon: "FileText", sortOrder: 7 },
+  { key: "reporting", name: "Cetak Laporan", href: "/laporan", moduleKey: "reporting", icon: "FileText", sortOrder: 8 },
   {
-    key: "settings", name: "Pengaturan", moduleKey: "project", icon: "Settings", sortOrder: 8,
+    key: "settings", name: "Pengaturan", moduleKey: "project", icon: "Settings", sortOrder: 9,
     children: [
       { key: "settings.entity", name: "Entity & Project", href: "/pengaturan/entity-project", moduleKey: "project", sortOrder: 1 },
       { key: "settings.org", name: "Struktur Organisasi", href: "/pengaturan/organisasi", moduleKey: "entity", sortOrder: 2 },
@@ -86,7 +94,7 @@ export const DEFAULT_MENU_TREE: MenuSeed[] = [
     ],
   },
   {
-    key: "accounts", name: "Daftar Akun", moduleKey: "accounts", icon: "UserCog", sortOrder: 9,
+    key: "accounts", name: "Daftar Akun", moduleKey: "accounts", icon: "UserCog", sortOrder: 10,
     children: [
       { key: "accounts.staff", name: "Pengelola / Pemilik", href: "/akun/pengelola", moduleKey: "accounts", sortOrder: 1 },
       { key: "accounts.tenant", name: "Akun Penghuni", href: "/akun/penghuni", moduleKey: "accounts", sortOrder: 2 },
@@ -96,15 +104,17 @@ export const DEFAULT_MENU_TREE: MenuSeed[] = [
 
 export const TENANT_PORTAL_MENUS: MenuSeed[] = [
   { key: "portal.home", name: "Beranda", href: "/portal", moduleKey: "dashboard", icon: "LayoutDashboard", sortOrder: 1 },
-  { key: "portal.profile", name: "Profil Saya", href: "/portal/profil", moduleKey: "tenant", icon: "User", sortOrder: 2 },
-  { key: "portal.billing", name: "Tagihan & Invoice", href: "/portal/tagihan", moduleKey: "billing", icon: "Wallet", sortOrder: 3 },
-  { key: "portal.transfer", name: "Permohonan Pindah", href: "/portal/pindah", moduleKey: "tenant", icon: "DoorOpen", sortOrder: 4 },
-  { key: "portal.repair", name: "Permintaan Perbaikan", href: "/portal/perbaikan", moduleKey: "maintenance", icon: "Wrench", sortOrder: 5 },
-  { key: "portal.announcement", name: "Pengumuman", href: "/portal/pengumuman", moduleKey: "announcement", icon: "Bell", sortOrder: 6 },
+  { key: "portal.guide", name: "Panduan Penggunaan", href: "/panduan", moduleKey: "dashboard", icon: "BookOpen", sortOrder: 2 },
+  { key: "portal.profile", name: "Profil Saya", href: "/portal/profil", moduleKey: "tenant", icon: "User", sortOrder: 3 },
+  { key: "portal.billing", name: "Tagihan & Invoice", href: "/portal/tagihan", moduleKey: "billing", icon: "Wallet", sortOrder: 4 },
+  { key: "portal.transfer", name: "Permohonan Pindah", href: "/portal/pindah", moduleKey: "tenant", icon: "DoorOpen", sortOrder: 5 },
+  { key: "portal.repair", name: "Permintaan Perbaikan", href: "/portal/perbaikan", moduleKey: "maintenance", icon: "Wrench", sortOrder: 6 },
+  { key: "portal.announcement", name: "Pengumuman", href: "/portal/pengumuman", moduleKey: "announcement", icon: "Bell", sortOrder: 7 },
 ];
 
 const TENANT_PORTAL_PERMISSIONS: Record<string, { canView: boolean; canCreate: boolean; canUpdate: boolean; canDelete: boolean }> = {
   "portal.home": { canView: true, canCreate: false, canUpdate: false, canDelete: false },
+  "portal.guide": { canView: true, canCreate: false, canUpdate: false, canDelete: false },
   "portal.profile": { canView: true, canCreate: false, canUpdate: false, canDelete: false },
   "portal.billing": { canView: true, canCreate: false, canUpdate: false, canDelete: false },
   "portal.transfer": { canView: true, canCreate: true, canUpdate: false, canDelete: false },
@@ -233,7 +243,10 @@ export async function ensureRbacSeeded() {
       for (const menu of flat) {
         for (const role of ALL_ROLES) {
           const level = getAccessLevel(role, menu.moduleKey as ModuleKey);
-          const crud = accessLevelToCrud(level);
+          const crud =
+            menu.key === "guide" && role === "TENANT"
+              ? { canView: false, canCreate: false, canUpdate: false, canDelete: false }
+              : accessLevelToCrud(level);
           await tx.roleMenuPermission.create({
             data: {
               role,
@@ -250,14 +263,104 @@ export async function ensureRbacSeeded() {
     return;
   }
 
-  const portalHome = await prisma.appMenu.findUnique({
-    where: { key: "portal.home" },
-    select: { key: true },
-  });
-  if (!portalHome) {
-    await ensurePortalMenus();
-    invalidatePermissionCache();
+  await ensureGuideMenus();
+  await ensureAccountingMenus();
+  invalidatePermissionCache();
+}
+
+/** Pastikan menu Panduan tersedia di DB yang sudah ada (staf + portal). */
+export async function ensureGuideMenus() {
+  const guideMenu = DEFAULT_MENU_TREE.find((m) => m.key === "guide");
+  if (guideMenu) {
+    const existing = await prisma.appMenu.findUnique({
+      where: { key: "guide" },
+      select: { key: true },
+    });
+
+    if (!existing) {
+      await prisma.appMenu.create({
+        data: {
+          key: guideMenu.key,
+          name: guideMenu.name,
+          href: guideMenu.href || null,
+          moduleKey: guideMenu.moduleKey,
+          icon: guideMenu.icon || null,
+          sortOrder: guideMenu.sortOrder,
+          isActive: true,
+        },
+      });
+
+      for (const role of ALL_ROLES) {
+        const isTenant = role === "TENANT";
+        const level = getAccessLevel(role, "dashboard");
+        const crud = isTenant
+          ? { canView: false, canCreate: false, canUpdate: false, canDelete: false }
+          : accessLevelToCrud(level);
+        await prisma.roleMenuPermission.create({
+          data: { role, menuKey: "guide", ...crud },
+        });
+      }
+    }
   }
+
+  await ensurePortalMenus();
+}
+
+/** Pastikan menu akuntansi tersedia di DB yang sudah ada. */
+export async function ensureAccountingMenus() {
+  const billing = DEFAULT_MENU_TREE.find((m) => m.key === "billing");
+  if (!billing?.children) return;
+
+  for (const child of billing.children) {
+    await prisma.appMenu.upsert({
+      where: { key: child.key },
+      create: {
+        key: child.key,
+        name: child.name,
+        href: child.href || null,
+        parentKey: "billing",
+        moduleKey: child.moduleKey,
+        icon: child.icon || null,
+        sortOrder: child.sortOrder,
+        isActive: true,
+      },
+      update: {
+        name: child.name,
+        href: child.href || null,
+        parentKey: "billing",
+        moduleKey: child.moduleKey,
+        sortOrder: child.sortOrder,
+        isActive: true,
+      },
+    });
+
+    for (const role of ALL_ROLES) {
+      if (role === "TENANT") {
+        await prisma.roleMenuPermission.upsert({
+          where: { role_menuKey: { role, menuKey: child.key } },
+          create: {
+            role,
+            menuKey: child.key,
+            canView: false,
+            canCreate: false,
+            canUpdate: false,
+            canDelete: false,
+          },
+          update: {},
+        });
+        continue;
+      }
+      const level = getAccessLevel(role, child.moduleKey as ModuleKey);
+      const crud = accessLevelToCrud(level);
+      await prisma.roleMenuPermission.upsert({
+        where: { role_menuKey: { role, menuKey: child.key } },
+        create: { role, menuKey: child.key, ...crud },
+        update: {},
+      });
+    }
+  }
+
+  invalidatePermissionCache();
 }
 
 export async function ensurePortalMenus() {
@@ -542,12 +645,18 @@ export async function resetPermissionsFromMatrix() {
       for (const role of ALL_ROLES) {
         const level = getAccessLevel(role, menu.moduleKey as ModuleKey);
         const crud = accessLevelToCrud(level);
+        // Staff guide: hide from TENANT (they use portal.guide)
+        const finalCrud =
+          menu.key === "guide" && role === "TENANT"
+            ? { canView: false, canCreate: false, canUpdate: false, canDelete: false }
+            : crud;
         await tx.roleMenuPermission.create({
-          data: { role, menuKey: menu.key, ...crud },
+          data: { role, menuKey: menu.key, ...finalCrud },
         });
       }
     }
   });
+  await ensurePortalMenus();
   invalidatePermissionCache();
 }
 

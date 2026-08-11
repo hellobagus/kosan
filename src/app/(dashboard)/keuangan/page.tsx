@@ -112,6 +112,31 @@ export default function KeuanganPage() {
           </CardBody>
         </Card>
       </div>
+
+      <Card className="mt-6">
+        <CardBody>
+          <h3 className="font-semibold text-slate-900 mb-3">Akuntansi</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {[
+              { href: "/keuangan/jurnal", label: "Jurnal Umum" },
+              { href: "/keuangan/buku-besar", label: "Buku Besar" },
+              { href: "/keuangan/neraca-saldo", label: "Neraca Saldo" },
+              { href: "/keuangan/laba-rugi", label: "Laba Rugi" },
+              { href: "/keuangan/neraca", label: "Neraca" },
+              { href: "/keuangan/akun", label: "Bagan Akun" },
+              { href: "/keuangan/periode", label: "Periode & Setup" },
+            ].map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="px-4 py-3 rounded-lg border border-slate-200 hover:border-teal-300 hover:bg-teal-50 text-sm font-medium text-slate-700 transition-colors"
+              >
+                {item.label}
+              </Link>
+            ))}
+          </div>
+        </CardBody>
+      </Card>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useProjectRefreshKey } from "@/hooks/useProjectRefresh";
 import { Printer, Download } from "lucide-react";
 import { PageHeader, Card, CardBody, Table, Th, Td, Select, Button } from "@/components/ui";
@@ -116,6 +117,29 @@ export default function LaporanPage() {
           </div>
         }
       />
+
+      <Card className="mb-6 no-print">
+        <CardBody>
+          <h3 className="font-semibold text-slate-900 mb-3">Laporan Akuntansi</h3>
+          <div className="flex flex-wrap gap-2">
+            {[
+              { href: "/keuangan/neraca-saldo", label: "Neraca Saldo" },
+              { href: "/keuangan/laba-rugi", label: "Laba Rugi" },
+              { href: "/keuangan/neraca", label: "Neraca" },
+              { href: "/keuangan/jurnal", label: "Jurnal Umum" },
+              { href: "/keuangan/buku-besar", label: "Buku Besar" },
+            ].map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="px-3 py-2 rounded-lg border border-slate-200 hover:border-teal-300 hover:bg-teal-50 text-sm font-medium text-slate-700"
+              >
+                {item.label}
+              </Link>
+            ))}
+          </div>
+        </CardBody>
+      </Card>
 
       <Card className="mb-6 no-print">
         <CardBody>

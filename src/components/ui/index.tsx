@@ -142,16 +142,16 @@ export function Table({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function Th({ children, className }: { children: React.ReactNode; className?: string }) {
+export function Th({ children, className, colSpan }: { children?: React.ReactNode; className?: string; colSpan?: number }) {
   return (
-    <th className={cn("px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50", className)}>
+    <th colSpan={colSpan} className={cn("px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50", className)}>
       {children}
     </th>
   );
 }
 
-export function Td({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <td className={cn("px-4 py-3.5 text-slate-700 border-t border-slate-100", className)}>{children}</td>;
+export function Td({ children, className, colSpan }: { children?: React.ReactNode; className?: string; colSpan?: number }) {
+  return <td colSpan={colSpan} className={cn("px-4 py-3.5 text-slate-700 border-t border-slate-100", className)}>{children}</td>;
 }
 
 export function EmptyState({ message }: { message: string }) {

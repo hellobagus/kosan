@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireStaffModule } from "@/lib/api-auth";
+import { createFinanceRecord, deleteFinanceWithJournal } from "@/lib/accounting-service";
 
 export async function GET(request: NextRequest) {
   try {
@@ -43,6 +44,7 @@ export async function GET(request: NextRequest) {
         tenant: { include: { user: true } },
         room: true,
         createdByUser: true,
+        journalEntry: { select: { id: true, entryNumber: true, status: true } },
       },
       orderBy: { transactionDate: "desc" },
     });
@@ -70,8 +72,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Data wajib belum lengkap" }, { status: 400 });
     }
 
-    const finance = await prisma.finance.create({
-      data: {
+    const finance = await prisma.$transaction(async (tx) => {
+      const created = await createFinanceRecord(tx, {
         type,
         amount: parseFloat(amount),
         description,
@@ -83,17 +85,23 @@ export async function POST(request: NextRequest) {
         createdBy: auth.session.userId,
         createdByName: auth.session.name,
         updatedByName: auth.session.name,
-      },
-      include: {
-        tenant: { include: { user: true } },
-        room: true,
-      },
+      });
+
+      return tx.finance.findUniqueOrThrow({
+        where: { id: created.id },
+        include: {
+          tenant: { include: { user: true } },
+          room: true,
+          journalEntry: { select: { id: true, entryNumber: true, status: true } },
+        },
+      });
     });
 
     return NextResponse.json(finance, { status: 201 });
   } catch (error) {
     console.error("Finances POST error:", error);
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
+    const message = error instanceof Error ? error.message : "Server error";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
@@ -113,10 +121,13 @@ export async function DELETE(request: NextRequest) {
     });
     if (!existing) return NextResponse.json({ error: "Transaksi tidak ditemukan" }, { status: 404 });
 
-    await prisma.finance.delete({ where: { id: parseInt(id) } });
+    await prisma.$transaction(async (tx) => {
+      await deleteFinanceWithJournal(tx, parseInt(id));
+    });
     return NextResponse.json({ message: "Transaksi berhasil dihapus" });
   } catch (error) {
     console.error("Finances DELETE error:", error);
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
+    const message = error instanceof Error ? error.message : "Server error";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

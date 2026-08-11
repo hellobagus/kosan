@@ -1,5 +1,6 @@
 import type { RepairCategory } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { createFinanceRecord } from "@/lib/accounting-service";
 import {
   notifyStaffNewRepairRequest,
   notifyTenantRepairStatusUpdate,
@@ -118,19 +119,17 @@ export async function completeTenantRepair(
   return prisma.$transaction(async (tx) => {
     let financeId: number | undefined;
     if (cost > 0) {
-      const finance = await tx.finance.create({
-        data: {
-          type: "EXPENSE",
-          amount: cost,
-          description: `Perbaikan unit: ${request.title}`,
-          category: "Maintenance Unit",
-          projectId: request.projectId,
-          roomId: request.roomId,
-          tenantId: request.tenantId,
-          createdBy: data.userId,
-          createdByName: actorName,
-          updatedByName: actorName,
-        },
+      const finance = await createFinanceRecord(tx, {
+        type: "EXPENSE",
+        amount: cost,
+        description: `Perbaikan unit: ${request.title}`,
+        category: "Maintenance Unit",
+        projectId: request.projectId,
+        roomId: request.roomId,
+        tenantId: request.tenantId,
+        createdBy: data.userId,
+        createdByName: actorName,
+        updatedByName: actorName,
       });
       financeId = finance.id;
     }

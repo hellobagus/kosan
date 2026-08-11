@@ -8,6 +8,7 @@ import {
   PageHeader, Card, CardBody, Table, Th, Td, Badge, EmptyState, Button,
 } from "@/components/ui";
 import { formatCurrency } from "@/lib/utils";
+import { zoneLabelForRoom } from "@/lib/room-zones";
 
 interface Room {
   id: number;
@@ -17,6 +18,7 @@ interface Room {
   facilities: string | null;
   status: string;
   tenants: Array<{ user: { name: string } }>;
+  floorRef?: { id: number; name: string; level: number } | null;
 }
 
 const statusMap: Record<string, { label: string; variant: "success" | "warning" | "danger" | "info" }> = {
@@ -79,7 +81,7 @@ export default function RoomListPage({
               <thead>
                 <tr>
                   <Th>No. Kamar</Th>
-                  <Th>Lantai</Th>
+                  <Th>Colour</Th>
                   <Th>Harga/Bulan</Th>
                   <Th>Fasilitas</Th>
                   <Th>Status</Th>
@@ -89,10 +91,15 @@ export default function RoomListPage({
               <tbody>
                 {rooms.map((room) => {
                   const st = statusMap[room.status] || statusMap.AVAILABLE;
+                  const warna = zoneLabelForRoom({
+                    floorName: room.floorRef?.name,
+                    floorLevel: room.floorRef?.level ?? room.floor,
+                    roomNumber: room.roomNumber,
+                  });
                   return (
                     <tr key={room.id} className="hover:bg-slate-50">
                       <Td><span className="font-semibold text-slate-900">{room.roomNumber}</span></Td>
-                      <Td>Lantai {room.floor}</Td>
+                      <Td>{warna}</Td>
                       <Td>{formatCurrency(room.price)}</Td>
                       <Td><span className="text-slate-500 text-xs">{room.facilities || "-"}</span></Td>
                       <Td><Badge variant={st.variant}>{st.label}</Badge></Td>

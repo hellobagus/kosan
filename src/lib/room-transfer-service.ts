@@ -1,5 +1,6 @@
 import { Prisma, RoomTransferStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { createFinanceRecord } from "@/lib/accounting-service";
 import { generateTransferLetterNumber, resolveProjectFromRoom } from "@/lib/document-number";
 import { roomProjectFilter } from "@/lib/project-context";
 import { activateRoomAssetsForTenant, getTenantCheckoutAssets, inspectCheckoutAssets } from "@/lib/inventory-service";
@@ -519,22 +520,20 @@ export async function updateTransferBilling(id: number, userId?: number) {
   const amount = parseAmount(transfer.financeAdjustmentAmount);
   await prisma.$transaction(async (tx) => {
     if (amount !== 0) {
-      await tx.finance.create({
-        data: {
-          type: amount > 0 ? "INCOME" : "EXPENSE",
-          amount: Math.abs(amount),
-          description:
-            amount > 0
-              ? `Selisih pindah kamar - ${transfer.tenant.user.name} (${transfer.fromRoom.roomNumber} ke ${transfer.toRoom.roomNumber})`
-              : `Refund selisih pindah kamar - ${transfer.tenant.user.name} (${transfer.fromRoom.roomNumber} ke ${transfer.toRoom.roomNumber})`,
-          category: "Pindah Kamar",
-          transactionDate: new Date(),
-          tenantId: transfer.tenantId,
-          roomId: transfer.toRoomId,
-          createdBy: userId,
-          createdByName: actorName,
-          updatedByName: actorName,
-        },
+      await createFinanceRecord(tx, {
+        type: amount > 0 ? "INCOME" : "EXPENSE",
+        amount: Math.abs(amount),
+        description:
+          amount > 0
+            ? `Selisih pindah kamar - ${transfer.tenant.user.name} (${transfer.fromRoom.roomNumber} ke ${transfer.toRoom.roomNumber})`
+            : `Refund selisih pindah kamar - ${transfer.tenant.user.name} (${transfer.fromRoom.roomNumber} ke ${transfer.toRoom.roomNumber})`,
+        category: "Pindah Kamar",
+        transactionDate: new Date(),
+        tenantId: transfer.tenantId,
+        roomId: transfer.toRoomId,
+        createdBy: userId,
+        createdByName: actorName,
+        updatedByName: actorName,
       });
     }
 

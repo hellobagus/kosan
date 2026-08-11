@@ -13,14 +13,18 @@ const publicPaths = [
   "/api/auth/logout",
   "/api/health",
   "/api/payments/midtrans/notification",
+  "/api/public",
   "/uploads/",
+  "/kamar-tersedia",
+  "/daftar",
 ];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (
-    publicPaths.some((p) => pathname.startsWith(p)) ||
+    pathname === "/" ||
+    publicPaths.some((p) => pathname === p || pathname.startsWith(`${p}/`)) ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon")
   ) {

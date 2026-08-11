@@ -2,6 +2,15 @@
 
 Aplikasi web untuk mengelola kosan (boarding house) dengan fitur lengkap: dashboard, manajemen kamar, penghuni, keuangan, laporan, dan akun pengguna.
 
+## Dokumentasi Pengguna
+
+Panduan cara pakai tersedia di dalam aplikasi:
+
+- Menu **Panduan Penggunaan** (staf & portal penghuni) → `/panduan`
+- Konten terpisah per peran (Super Admin, Front Office, Finance, Penghuni, dll.)
+
+Versi markdown lengkap (untuk cetak/share): **[docs/PANDUAN-PENGGUNA.md](docs/PANDUAN-PENGGUNA.md)**
+
 ## Tech Stack
 
 - **Framework:** Next.js 14 (App Router)

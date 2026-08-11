@@ -1,0 +1,16 @@
+flowchart TD
+  create["Lapor kerusakan di portal<br/>AC, listrik, plumbing, dll.<br/><i>Penghuni</i>"]
+  triage["Terima / assign tiket<br/><i>Front Office</i>"]
+  fix["Perbaikan di lokasi<br/><i>Maintenance</i>"]
+  close["Tutup tiket<br/><i>Maintenance</i>"]
+  view["Status terlihat di portal<br/><i>Penghuni</i>"]
+
+  create --> triage --> fix --> close --> view
+
+  classDef tenant fill:#3685bf,stroke:#3685bf,color:#fff
+  classDef fo fill:#0f766e,stroke:#0f766e,color:#fff
+  classDef maint fill:#d75c4e,stroke:#d75c4e,color:#fff
+
+  class create,view tenant
+  class triage fo
+  class fix,close maint

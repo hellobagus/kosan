@@ -1,5 +1,6 @@
 import { TenantStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { createFinanceRecord } from "@/lib/accounting-service";
 import { getProjectProfileForRoom } from "@/lib/settings-service";
 import { buildContractHtml, toContractTenant } from "@/lib/contract-service";
 import { kosanProfileToContractProfile } from "@/lib/contract-profile";
@@ -255,19 +256,17 @@ export async function refundDeposit(tenantId: number, amount: number, userId: nu
     });
 
     if (amount > 0) {
-      await tx.finance.create({
-        data: {
-          type: "EXPENSE",
-          amount,
-          description: `Pengembalian Deposit - ${tenant.user.name} (Kamar ${tenant.room.roomNumber})`,
-          category: "Deposit",
-          transactionDate: new Date(),
-          tenantId,
-          roomId: tenant.roomId,
-          createdBy: userId,
-          createdByName: actor?.name ?? null,
-          updatedByName: actor?.name ?? null,
-        },
+      await createFinanceRecord(tx, {
+        type: "EXPENSE",
+        amount,
+        description: `Pengembalian Deposit - ${tenant.user.name} (Kamar ${tenant.room.roomNumber})`,
+        category: "Deposit",
+        transactionDate: new Date(),
+        tenantId,
+        roomId: tenant.roomId,
+        createdBy: userId,
+        createdByName: actor?.name ?? null,
+        updatedByName: actor?.name ?? null,
       });
     }
     return t;

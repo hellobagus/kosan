@@ -1,5 +1,6 @@
 import { AssetStatus, InspectionResult, InventoryLocationType, MaintenanceStatus, Prisma, PurchaseStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { createFinanceRecord } from "@/lib/accounting-service";
 
 export const LOCATION_TYPE_LABELS: Record<InventoryLocationType, string> = {
   WAREHOUSE: "Gudang",
@@ -181,17 +182,16 @@ export async function receivePurchase(
       }
     }
 
-    const finance = await tx.finance.create({
-      data: {
-        type: "EXPENSE",
-        amount: purchase.totalAmount,
-        description: `Pembelian barang ${purchase.purchaseNumber}`,
-        category: "Pembelian Inventaris",
-        transactionDate: new Date(),
-        createdBy: userId,
-        createdByName: actorName,
-        updatedByName: actorName,
-      },
+    const finance = await createFinanceRecord(tx, {
+      type: "EXPENSE",
+      amount: Number(purchase.totalAmount),
+      description: `Pembelian barang ${purchase.purchaseNumber}`,
+      category: "Pembelian Inventaris",
+      transactionDate: new Date(),
+      projectId: purchase.projectId,
+      createdBy: userId,
+      createdByName: actorName,
+      updatedByName: actorName,
     });
 
     await tx.purchase.update({
@@ -412,18 +412,16 @@ export async function completeMaintenance(
     let financeId: number | undefined;
     const cost = data.cost ?? Number(maintenance.cost);
     if (cost > 0) {
-      const finance = await tx.finance.create({
-        data: {
-          type: "EXPENSE",
-          amount: cost,
-          description: `Biaya maintenance: ${maintenance.title}`,
-          category: "Maintenance Inventaris",
-          roomId: maintenance.roomId,
-          tenantId: maintenance.tenantId,
-          createdBy: data.userId,
-          createdByName: actorName,
-          updatedByName: actorName,
-        },
+      const finance = await createFinanceRecord(tx, {
+        type: "EXPENSE",
+        amount: cost,
+        description: `Biaya maintenance: ${maintenance.title}`,
+        category: "Maintenance Inventaris",
+        roomId: maintenance.roomId,
+        tenantId: maintenance.tenantId,
+        createdBy: data.userId,
+        createdByName: actorName,
+        updatedByName: actorName,
       });
       financeId = finance.id;
     }
@@ -555,18 +553,16 @@ export async function inspectCheckoutAssets(
         data: { deposit: currentDeposit - deduction, updatedByName: actorName },
       });
       if (deduction > 0) {
-        await tx.finance.create({
-          data: {
-            type: "INCOME",
-            amount: deduction,
-            description: `Potong deposit kerusakan barang - ${tenant.invoiceNumber || `Penghuni #${tenantId}`}`,
-            category: "Potong Deposit",
-            tenantId,
-            roomId: tenant.roomId,
-            createdBy: userId,
-            createdByName: actorName,
-            updatedByName: actorName,
-          },
+        await createFinanceRecord(tx, {
+          type: "INCOME",
+          amount: deduction,
+          description: `Potong deposit kerusakan barang - ${tenant.invoiceNumber || `Penghuni #${tenantId}`}`,
+          category: "Potong Deposit",
+          tenantId,
+          roomId: tenant.roomId,
+          createdBy: userId,
+          createdByName: actorName,
+          updatedByName: actorName,
         });
       }
     }

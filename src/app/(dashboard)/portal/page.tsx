@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Bell, DoorOpen, User, Wallet, Wrench } from "lucide-react";
+import { Bell, BookOpen, DoorOpen, User, Wallet, Wrench } from "lucide-react";
 import { Card, CardBody, PageHeader } from "@/components/ui";
 import { formatCurrency, formatShortDate } from "@/lib/utils";
 
@@ -60,6 +60,7 @@ export default function TenantPortalHomePage() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
         {[
+          { href: "/panduan", label: "Panduan Penggunaan", icon: BookOpen },
           { href: "/portal/profil", label: "Profil Saya", icon: User },
           { href: "/portal/tagihan", label: "Tagihan & Invoice", icon: Wallet },
           { href: "/portal/perbaikan", label: "Permintaan Perbaikan", icon: Wrench },

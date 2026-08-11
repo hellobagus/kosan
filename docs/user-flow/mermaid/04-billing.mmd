@@ -1,0 +1,17 @@
+flowchart TD
+  gen["Generate / catat tagihan<br/>Sewa, utilitas, denda<br/><i>Finance</i>"]
+  notify["Tagihan muncul di portal<br/><i>Sistem</i>"]
+  pay["Penghuni bayar<br/>Transfer / Midtrans<br/><i>Penghuni</i>"]
+  confirm["Konfirmasi / catat pembayaran<br/><i>Finance</i>"]
+  ledger["Jurnal & laporan keuangan<br/>Akuntansi otomatis<br/><i>Sistem</i>"]
+  invoice["Invoice tersedia<br/><i>Penghuni</i>"]
+
+  gen --> notify --> pay --> confirm --> ledger --> invoice
+
+  classDef finance fill:#1f8a65,stroke:#1f8a65,color:#fff
+  classDef system fill:#e2e8f0,stroke:#94a3b8,color:#0f172a
+  classDef tenant fill:#3685bf,stroke:#3685bf,color:#fff
+
+  class gen,confirm finance
+  class notify,ledger system
+  class pay,invoice tenant

@@ -96,13 +96,13 @@ export default function TambahKamarPage() {
                 required
               />
               <Select
-                label="Lantai"
+                label="Colour / Zone"
                 value={form.floor}
                 onChange={(e) => setForm({ ...form, floor: e.target.value })}
               >
-                {[1, 2, 3, 4, 5].map((f) => (
-                  <option key={f} value={f}>Lantai {f}</option>
-                ))}
+                <option value="1">Blue</option>
+                <option value="2">Green</option>
+                <option value="3">Purple</option>
               </Select>
             </div>
 
