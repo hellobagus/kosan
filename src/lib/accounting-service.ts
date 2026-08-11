@@ -657,8 +657,8 @@ export async function getGeneralLedger(
       })
     : [];
 
-  let openingDebit = openingLines.reduce((s, l) => s + asNum(l.debit), 0);
-  let openingCredit = openingLines.reduce((s, l) => s + asNum(l.credit), 0);
+  const openingDebit = openingLines.reduce((s, l) => s + asNum(l.debit), 0);
+  const openingCredit = openingLines.reduce((s, l) => s + asNum(l.credit), 0);
   let running =
     account.normalBalance === "DEBIT"
       ? openingDebit - openingCredit
